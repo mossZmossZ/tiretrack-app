@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+
+# Environment
+.env
+
+# Data files (contain business data)
+server/data/*.csv
+!server/data/.gitkeep
+
+# Build output
+client/dist/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Stitch fetch (design tool artifacts)
+stitch-fetch/
