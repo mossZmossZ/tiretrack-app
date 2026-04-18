@@ -3,10 +3,12 @@ import { useAuth } from './contexts/AuthContext.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import Sidebar from './components/layout/Sidebar.jsx';
 import MobileNav from './components/layout/MobileNav.jsx';
+import AdminMobileNav from './components/layout/AdminMobileNav.jsx';
 import Dashboard from './pages/admin/Dashboard.jsx';
 import ServiceLog from './pages/admin/ServiceLog.jsx';
 import ImportExport from './pages/admin/ImportExport.jsx';
 import Inventory from './pages/admin/Inventory.jsx';
+import BackupSettings from './pages/admin/BackupSettings.jsx';
 import QuickInput from './pages/tech/QuickInput.jsx';
 import RecentEntries from './pages/tech/RecentEntries.jsx';
 
@@ -33,9 +35,10 @@ function AdminLayout() {
   return (
     <div className="flex min-h-screen bg-surface">
       <Sidebar />
-      <main className="ml-64 flex-1 p-8 max-w-6xl">
+      <main className="flex-1 md:ml-64 w-full max-w-[1920px] mx-auto p-4 md:p-8 pb-24 md:pb-8">
         <Outlet />
       </main>
+      <AdminMobileNav />
     </div>
   );
 }
@@ -76,6 +79,7 @@ export default function App() {
           <Route path="/admin/services" element={<ServiceLog />} />
           <Route path="/admin/inventory" element={<Inventory />} />
           <Route path="/admin/import" element={<ImportExport />} />
+          <Route path="/admin/backup" element={<BackupSettings />} />
           <Route path="/admin/input" element={<QuickInput />} />
         </Route>
       </Route>
