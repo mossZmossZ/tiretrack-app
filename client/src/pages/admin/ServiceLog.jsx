@@ -99,21 +99,21 @@ export default function ServiceLog() {
         </div>
 
         {/* Search & Filter */}
-        <div className="flex gap-2">
-          <form onSubmit={handleSearch} className="relative">
+        <div className="flex flex-wrap gap-2 mt-3 sm:mt-0">
+          <form onSubmit={handleSearch} className="relative w-full sm:w-auto">
             <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-lg">search</span>
             <input
               type="text"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="ค้นหาทะเบียน, รุ่นรถ..."
-              className="pl-10 pr-4 py-2 rounded-xl border border-border bg-white text-sm w-56 outline-none focus:border-primary transition-colors"
+              className="pl-10 pr-4 py-2 rounded-xl border border-border bg-white text-sm w-full sm:w-56 outline-none focus:border-primary transition-colors"
             />
           </form>
           <select
             value={filterType}
             onChange={e => { setFilterType(e.target.value); setPage(1); }}
-            className="px-3 py-2 rounded-xl border border-border bg-white text-sm outline-none focus:border-primary"
+            className="w-full sm:w-auto px-3 py-2 rounded-xl border border-border bg-white text-sm outline-none focus:border-primary"
           >
             <option value="">ทุกประเภท</option>
             {SERVICE_TYPES.map(s => (

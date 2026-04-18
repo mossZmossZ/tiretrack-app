@@ -6,6 +6,7 @@ const NAV_ITEMS = [
   { to: '/admin/services', icon: 'list_alt', label: 'ประวัติบริการ' },
   { to: '/admin/inventory', icon: 'inventory_2', label: 'ฐานข้อมูลยาง' },
   { to: '/admin/import', icon: 'upload_file', label: 'นำเข้า/ส่งออก' },
+  { to: '/admin/backup', icon: 'cloud_sync', label: 'สำรองข้อมูล' },
 ];
 
 export default function Sidebar() {
@@ -18,7 +19,7 @@ export default function Sidebar() {
   };
 
   return (
-    <nav className="bg-white border-r border-border h-screen w-64 flex flex-col fixed left-0 top-0 z-40">
+    <nav className="bg-white border-r border-border h-screen w-64 hidden md:flex flex-col fixed left-0 top-0 z-40">
       {/* Logo */}
       <div className="p-6 pb-4">
         <div className="flex items-center gap-2">

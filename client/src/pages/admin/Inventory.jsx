@@ -176,7 +176,7 @@ export default function Inventory() {
         </div>
 
         {/* Search & Actions */}
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 mt-3 sm:mt-0">
           <div className="relative">
             <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-lg">search</span>
             <input
@@ -184,7 +184,7 @@ export default function Inventory() {
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="ค้นหาขนาด, ยี่ห้อ, รุ่น..."
-              className="pl-10 pr-4 py-2 rounded-xl border border-border bg-white text-sm w-40 lg:w-56 outline-none focus:border-primary transition-colors"
+              className="pl-10 pr-4 py-2 rounded-xl border border-border bg-white text-sm w-full sm:w-40 lg:w-56 outline-none focus:border-primary transition-colors"
             />
           </div>
           

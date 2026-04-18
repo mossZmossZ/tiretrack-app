@@ -31,7 +31,7 @@ It replaces manual logbooks and Google Sheets with a streamlined digital service
 
 | Role       | Access                                          | Device     |
 | ---------- | ----------------------------------------------- | ---------- |
-| Admin (CEO) | Full: input, view, dashboard, analyze, import/export | Desktop PC |
+| Admin (CEO) | Full: input, view, dashboard, analyze, import/export | Desktop PC & Mobile (responsive) |
 | Technician | Input data, view recent entries, undo last input | Mobile phone (responsive) |
 
 ### Authentication
@@ -68,7 +68,7 @@ No user accounts, no OAuth. Small business — keep it simple.
 | Phase   | Storage       | Purpose                        |
 | ------- | ------------- | ------------------------------ |
 | Phase 1 | CSV files     | Local flat-file, easy to debug |
-| Phase 2 | Google Sheets | Cloud sync, manual fallback    |
+| Phase 5 | MinIO S3      | Auto-backup and manual restore |
 
 ### Design System
 
@@ -257,8 +257,9 @@ tiretrack-app/
 | Phase 2 | Optional license plate feature, Data Edit features, UX improvements | ✅ Done |
 | Phase 3 | SweetAlert confirmations, Resilient API timeouts, UI polish | ✅ Done |
 | Phase 4 | Tire Inventory System, Dynamic Cost & Net Profit tracking, Inventory Import/Export | ✅ Done |
-| Phase 5 | Google Sheets integration, Advanced analytics | 📋 Planned |
-| Phase 6 | Docker/K8s deployment, Performance optimization | 📋 Planned |
+| Phase 5 | S3 Backup & Restore, Auto-backup scheduling with MinIO | ✅ Done |
+| Phase 6 | Google Sheets integration, Advanced analytics | 📋 Planned |
+| Phase 7 | Docker/K8s deployment, Performance optimization | 📋 Planned |
 
 ---
 
