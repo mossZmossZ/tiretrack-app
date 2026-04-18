@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react';
+import Swal from 'sweetalert2';
+import withReactContent from 'sweetalert2-react-content';
 import { api } from '../../services/api.js';
 import { SERVICE_TYPES, SERVICE_TYPE_MAP, TIRE_BRANDS } from '../../utils/constants.js';
 import { formatCurrency, formatDate } from '../../utils/formatters.js';
+
+const MySwal = withReactContent(Swal);
 
 export default function ServiceLog() {
   const [records, setRecords] = useState([]);
@@ -11,6 +15,7 @@ export default function ServiceLog() {
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({ total: 0, pages: 1 });
   const [expanded, setExpanded] = useState(null);
+  const [editingRecord, setEditingRecord] = useState(null);
 
   const loadRecords = async () => {
     setLoading(true);
@@ -36,16 +41,52 @@ export default function ServiceLog() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('ต้องการลบรายการนี้ใช่ไหม?')) return;
+    const result = await MySwal.fire({
+      title: 'ต้องการลบรายการนี้ใช่ไหม?',
+      text: "คุณจะไม่สามารถกู้คืนข้อมูลนี้ได้!",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#F97316',
+      cancelButtonColor: '#94A3B8',
+      confirmButtonText: 'ลบเลย',
+      cancelButtonText: 'ยกเลิก'
+    });
+
+    if (result.isConfirmed) {
+      try {
+        const res = await api.delete(`/services/${id}`);
+        if (res.success) {
+          setRecords(r => r.filter(rec => rec.id !== id));
+          MySwal.fire({ title: 'ลบสำเร็จ!', icon: 'success', confirmButtonColor: '#F97316' });
+        } else {
+          MySwal.fire({ title: 'ผิดพลาด', text: res.error, icon: 'error', confirmButtonColor: '#F97316' });
+        }
+      } catch {
+        MySwal.fire({ title: 'ผิดพลาด', text: 'เกิดข้อผิดพลาดในการเชื่อมต่อ', icon: 'error', confirmButtonColor: '#F97316' });
+      }
+    }
+  };
+
+  const handleEditSave = async (e) => {
+    e.preventDefault();
+    
+    MySwal.fire({
+      title: 'กำลังบันทึก...',
+      allowOutsideClick: false,
+      didOpen: () => MySwal.showLoading()
+    });
+
     try {
-      const res = await api.delete(`/services/${id}`);
+      const res = await api.put(`/services/${editingRecord.id}`, editingRecord);
       if (res.success) {
-        setRecords(r => r.filter(rec => rec.id !== id));
+        setRecords(r => r.map(rec => rec.id === editingRecord.id ? res.data : rec));
+        setEditingRecord(null);
+        MySwal.fire({ title: 'แก้ไขสำเร็จ!', icon: 'success', confirmButtonColor: '#F97316' });
       } else {
-        alert(res.error);
+        MySwal.fire({ title: 'ผิดพลาด', text: res.error, icon: 'error', confirmButtonColor: '#F97316' });
       }
     } catch {
-      alert('เกิดข้อผิดพลาด');
+      MySwal.fire({ title: 'ผิดพลาด', text: 'เชื่อมต่อขัดข้อง', icon: 'error', confirmButtonColor: '#F97316' });
     }
   };
 
@@ -122,7 +163,7 @@ export default function ServiceLog() {
                     >
                       <td className="px-4 py-3 text-text-secondary whitespace-nowrap">{formatDate(record.date)}</td>
                       <td className="px-4 py-3">
-                        <span className="font-semibold text-text-primary bg-surface-dim px-2 py-0.5 rounded">{record.license_plate}</span>
+                        <span className="font-semibold text-text-primary bg-surface-dim px-2 py-0.5 rounded">{record.license_plate || '-'}</span>
                         {record.car_model && <span className="text-xs text-text-muted ml-2">{record.car_model}</span>}
                       </td>
                       <td className="px-4 py-3">
@@ -151,7 +192,14 @@ export default function ServiceLog() {
                       <td className="px-4 py-3 text-right font-semibold text-text-primary whitespace-nowrap">
                         {formatCurrency(record.total_price)}
                       </td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-4 py-3 text-center whitespace-nowrap">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setEditingRecord({...record}); }}
+                          className="p-1.5 rounded-lg text-text-muted hover:text-primary hover:bg-primary-50 transition-colors mr-1"
+                          title="แก้ไข"
+                        >
+                          <span className="material-symbols-outlined text-lg">edit</span>
+                        </button>
                         <button
                           onClick={(e) => { e.stopPropagation(); handleDelete(record.id); }}
                           className="p-1.5 rounded-lg text-text-muted hover:text-danger hover:bg-danger-bg transition-colors"
@@ -191,6 +239,97 @@ export default function ServiceLog() {
           </div>
         )}
       </div>
+
+      {/* Edit Modal */}
+      {editingRecord && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 animate-fade-in backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+            <h3 className="text-xl font-bold mb-4" style={{ fontFamily: 'Manrope' }}>แก้ไขข้อมูลบริการ</h3>
+            <form onSubmit={handleEditSave} className="space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-text-secondary mb-1 block">ทะเบียนรถ</label>
+                <input
+                  type="text"
+                  value={editingRecord.license_plate}
+                  onChange={e => setEditingRecord({...editingRecord, license_plate: e.target.value})}
+                  className="w-full px-3 py-2 rounded-xl border border-border bg-surface-dim outline-none focus:border-primary"
+                />
+              </div>
+              
+              {editingRecord.service_type === 'tire_change' ? (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-semibold text-text-secondary mb-1 block">จำนวน (เส้น)</label>
+                      <input
+                        type="number"
+                        value={editingRecord.quantity}
+                        onChange={e => setEditingRecord({...editingRecord, quantity: e.target.value})}
+                        className="w-full px-3 py-2 rounded-xl border border-border bg-surface-dim outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-text-secondary mb-1 block">ราคา/เส้น</label>
+                      <input
+                        type="number"
+                        value={editingRecord.price_per_unit}
+                        onChange={e => setEditingRecord({...editingRecord, price_per_unit: e.target.value})}
+                        className="w-full px-3 py-2 rounded-xl border border-border bg-surface-dim outline-none"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-text-secondary mb-1 block">ยี่ห้อยาง</label>
+                    <select
+                      value={editingRecord.tire_brand}
+                      onChange={e => setEditingRecord({...editingRecord, tire_brand: e.target.value})}
+                      className="w-full px-3 py-2 rounded-xl border border-border bg-surface-dim outline-none"
+                    >
+                      <option value="">เลือก... </option>
+                      {TIRE_BRANDS.map(b => <option key={b.code} value={b.code}>{b.label}</option>)}
+                    </select>
+                  </div>
+                </>
+              ) : (
+                <div>
+                  <label className="text-xs font-semibold text-text-secondary mb-1 block">ราคารวม</label>
+                  <input
+                    type="number"
+                    value={editingRecord.total_price}
+                    onChange={e => setEditingRecord({...editingRecord, total_price: e.target.value})}
+                    className="w-full px-3 py-2 rounded-xl border border-border bg-surface-dim outline-none"
+                  />
+                </div>
+              )}
+              
+              <div>
+                <label className="text-xs font-semibold text-text-secondary mb-1 block">หมายเหตุ</label>
+                <textarea
+                  value={editingRecord.notes}
+                  onChange={e => setEditingRecord({...editingRecord, notes: e.target.value})}
+                  className="w-full px-3 py-2 rounded-xl border border-border bg-surface-dim outline-none resize-none"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingRecord(null)}
+                  className="flex-1 py-2.5 rounded-xl font-semibold bg-surface-dim hover:bg-border transition-colors"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 rounded-xl font-semibold text-white bg-primary hover:bg-primary-dark transition-colors"
+                >
+                  บันทึก
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

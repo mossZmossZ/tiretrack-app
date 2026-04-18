@@ -10,7 +10,7 @@ const CSV_PATH = path.join(DATA_DIR, 'services.csv');
 const HEADERS = [
   'id', 'date', 'license_plate', 'province', 'car_model', 'car_color',
   'service_type', 'quantity', 'tire_brand', 'tire_model', 'tire_size',
-  'price_per_unit', 'total_price', 'technician', 'notes', 'created_at', 'created_by'
+  'price_per_unit', 'total_price', 'technician', 'notes', 'cost_price', 'created_at', 'created_by'
 ];
 
 const HEADER_LINE = HEADERS.join(',');
@@ -118,6 +118,7 @@ export function create(data, createdBy = 'tech') {
     total_price: data.total_price || '0',
     technician: data.technician || '',
     notes: data.notes || '',
+    cost_price: data.cost_price || '0',
     created_at: new Date().toISOString(),
     created_by: createdBy
   };
@@ -146,6 +147,27 @@ export function deleteById(id) {
   });
   fs.writeFileSync(CSV_PATH, lines.join('\n') + '\n', 'utf-8');
   return true;
+}
+
+// Update by ID
+export function updateById(id, updates) {
+  ensureFile();
+  const all = readAll();
+  const idx = all.findIndex(r => r.id === id);
+  if (idx === -1) return null;
+
+  all[idx] = { ...all[idx], ...updates };
+
+  if (all[idx].service_type === 'tire_change' && all[idx].quantity && all[idx].price_per_unit) {
+    all[idx].total_price = String(Number(all[idx].quantity) * Number(all[idx].price_per_unit));
+  }
+
+  const lines = [HEADER_LINE];
+  all.forEach(record => {
+    lines.push(HEADERS.map(h => escapeCSV(record[h])).join(','));
+  });
+  fs.writeFileSync(CSV_PATH, lines.join('\n') + '\n', 'utf-8');
+  return all[idx];
 }
 
 // Get dashboard stats
@@ -182,15 +204,16 @@ export function getStats() {
   });
 
   const sumTotal = (records) => records.reduce((s, r) => s + Number(r.total_price || 0), 0);
+  const sumCost = (records) => records.reduce((s, r) => s + (Number(r.cost_price || 0) * Number(r.quantity || 1)), 0);
   const sumTires = (records) => records
     .filter(r => r.service_type === 'tire_change')
     .reduce((s, r) => s + Number(r.quantity || 0), 0);
 
   return {
     total: all.length,
-    today: { count: todayRecords.length, revenue: sumTotal(todayRecords), tires: sumTires(todayRecords) },
-    week: { count: weekRecords.length, revenue: sumTotal(weekRecords), tires: sumTires(weekRecords) },
-    month: { count: monthRecords.length, revenue: sumTotal(monthRecords), tires: sumTires(monthRecords) },
+    today: { count: todayRecords.length, revenue: sumTotal(todayRecords), cost: sumCost(todayRecords), profit: sumTotal(todayRecords) - sumCost(todayRecords), tires: sumTires(todayRecords) },
+    week: { count: weekRecords.length, revenue: sumTotal(weekRecords), cost: sumCost(weekRecords), profit: sumTotal(weekRecords) - sumCost(weekRecords), tires: sumTires(weekRecords) },
+    month: { count: monthRecords.length, revenue: sumTotal(monthRecords), cost: sumCost(monthRecords), profit: sumTotal(monthRecords) - sumCost(monthRecords), tires: sumTires(monthRecords) },
     serviceBreakdown,
     brandCounts,
     monthlyRevenue,

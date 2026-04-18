@@ -6,6 +6,7 @@ import MobileNav from './components/layout/MobileNav.jsx';
 import Dashboard from './pages/admin/Dashboard.jsx';
 import ServiceLog from './pages/admin/ServiceLog.jsx';
 import ImportExport from './pages/admin/ImportExport.jsx';
+import Inventory from './pages/admin/Inventory.jsx';
 import QuickInput from './pages/tech/QuickInput.jsx';
 import RecentEntries from './pages/tech/RecentEntries.jsx';
 
@@ -73,7 +74,9 @@ export default function App() {
         <Route element={<AdminLayout />}>
           <Route path="/admin/dashboard" element={<Dashboard />} />
           <Route path="/admin/services" element={<ServiceLog />} />
+          <Route path="/admin/inventory" element={<Inventory />} />
           <Route path="/admin/import" element={<ImportExport />} />
+          <Route path="/admin/input" element={<QuickInput />} />
         </Route>
       </Route>
 

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, CartesianGrid } from 'recharts';
 import { api } from '../../services/api.js';
 import { SERVICE_TYPE_MAP, TIRE_BRANDS } from '../../utils/constants.js';
@@ -9,6 +10,7 @@ const COLORS = ['#F97316', '#3B82F6', '#8B5CF6', '#10B981', '#F59E0B', '#EC4899'
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
     api.get('/services/stats')
@@ -62,33 +64,26 @@ export default function Dashboard() {
       </div>
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <StatCard
-          icon="calendar_today"
-          label="บริการวันนี้"
-          value={stats.today.count}
-          sub={formatCurrency(stats.today.revenue)}
-          color="#F97316"
-        />
-        <StatCard
-          icon="date_range"
-          label="สัปดาห์นี้"
-          value={stats.week.count}
-          sub={formatCurrency(stats.week.revenue)}
+          icon="calendar_month"
+          label="บริการเดือนนี้"
+          value={`${stats.month.count} รายการ`}
+          sub={`ยาง ${stats.month.tires} เส้น`}
           color="#3B82F6"
         />
         <StatCard
-          icon="calendar_month"
-          label="เดือนนี้"
-          value={stats.month.count}
-          sub={formatCurrency(stats.month.revenue)}
+          icon="payments"
+          label="รายรับรวม (เดือนนี้)"
+          value={formatCurrency(stats.month.revenue)}
+          sub={`ต้นทุน: ${formatCurrency(stats.month.cost || 0)}`}
           color="#8B5CF6"
         />
         <StatCard
-          icon="tire_repair"
-          label="ยางเปลี่ยนเดือนนี้"
-          value={`${stats.month.tires} เส้น`}
-          sub={`ทั้งหมด ${formatNumber(stats.total)} รายการ`}
+          icon="account_balance"
+          label="กำไรสุทธิ (เดือนนี้)"
+          value={formatCurrency(stats.month.profit || 0)}
+          sub={`ยอดรวมกำไรทั้งหมด`}
           color="#10B981"
         />
       </div>
@@ -120,6 +115,7 @@ export default function Dashboard() {
             <div className="flex items-center gap-6">
               <ResponsiveContainer width={160} height={160}>
                 <PieChart>
+                  <Tooltip />
                   <Pie
                     data={serviceData}
                     cx="50%"
@@ -128,6 +124,11 @@ export default function Dashboard() {
                     outerRadius={70}
                     dataKey="value"
                     stroke="none"
+                    onClick={(entry) => {
+                      const typeMapEntry = Object.entries(SERVICE_TYPE_MAP).find(([k, v]) => v.label === entry.name);
+                      if (typeMapEntry) navigate(`/admin/services?type=${typeMapEntry[0]}`);
+                    }}
+                    style={{ cursor: 'pointer' }}
                   >
                     {serviceData.map((entry, i) => (
                       <Cell key={i} fill={entry.color} />

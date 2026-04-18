@@ -1,7 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
+import Select from 'react-select';
 import { SERVICE_TYPES, TIRE_BRANDS, TIRE_SIZES, CAR_COLORS, PROVINCES, QUANTITY_OPTIONS } from '../../utils/constants.js';
 import { formatCurrency, getToday } from '../../utils/formatters.js';
 import { api } from '../../services/api.js';
+
+const provinceOptions = PROVINCES.map(p => ({ value: p, label: p }));
+const colorOptions = CAR_COLORS.map(c => ({ value: c, label: c }));
 
 export default function QuickInput() {
   const [form, setForm] = useState({
@@ -18,15 +22,28 @@ export default function QuickInput() {
     total_price: '',
     technician: '',
     notes: '',
+    cost_price: '',
     date: getToday(),
   });
   const [step, setStep] = useState(1); // 1=service type, 2=plate, 3=details, 4=confirm
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState(null);
   const [suggestions, setSuggestions] = useState([]);
+  const [inventory, setInventory] = useState([]);
   const plateRef = useRef(null);
 
   const isTireChange = form.service_type === 'tire_change';
+
+  // Load inventory
+  useEffect(() => {
+    const loadInventory = async () => {
+      try {
+        const res = await api.get('/inventory');
+        if (res.success) setInventory(res.data);
+      } catch {}
+    };
+    loadInventory();
+  }, []);
 
   // Auto-calculate total
   useEffect(() => {
@@ -80,7 +97,6 @@ export default function QuickInput() {
   };
 
   const goToDetails = () => {
-    if (!form.license_plate.trim()) return;
     setSuggestions([]);
     setStep(3);
   };
@@ -102,7 +118,7 @@ export default function QuickInput() {
         // Reset form
         setForm({
           service_type: '', license_plate: '', province: '', car_model: '', car_color: '',
-          quantity: '4', tire_brand: '', tire_model: '', tire_size: '',
+          quantity: '4', tire_brand: '', tire_model: '', tire_size: '', cost_price: '',
           price_per_unit: '', total_price: '', technician: '', notes: '', date: getToday(),
         });
         setStep(1);
@@ -128,27 +144,69 @@ export default function QuickInput() {
     }
   };
 
+  const inventoryOptions = inventory.map(item => {
+    const brandLabel = TIRE_BRANDS.find(b => b.code === item.tire_brand)?.label || item.tire_brand;
+    const desc = [brandLabel, item.tire_size, item.tire_model].filter(Boolean).join(' | ');
+    return {
+      value: item.id,
+      label: `${desc} (ต้นทุน: ${formatCurrency(item.cost_price)})`,
+      item: item
+    };
+  });
+
+  const handleInventorySelect = (opt) => {
+    if (!opt) {
+      setForm(f => ({ ...f, tire_brand: '', tire_size: '', tire_model: '', cost_price: '' }));
+      return;
+    }
+    const { item } = opt;
+    setForm(f => ({
+      ...f,
+      tire_brand: item.tire_brand,
+      tire_size: item.tire_size,
+      tire_model: item.tire_model,
+      cost_price: item.cost_price
+    }));
+  };
+
   const currentServiceType = SERVICE_TYPES.find(s => s.value === form.service_type);
 
   return (
     <div className="min-h-screen bg-surface pb-24">
       {/* Header */}
       <div className="sticky top-0 z-10 glass border-b border-border-light px-4 py-3">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {step > 1 && (
+              <button onClick={() => setStep(s => s - 1)} className="p-1 -ml-1 text-text-secondary">
+                <span className="material-symbols-outlined">arrow_back</span>
+              </button>
+            )}
+            <div>
+              <h1 className="text-lg font-bold" style={{ fontFamily: 'Manrope' }}>บันทึกบริการ</h1>
+              <p className="text-xs text-text-muted">
+                {step === 1 && 'เลือกประเภทบริการ'}
+                {step === 2 && 'ใส่ทะเบียนรถ'}
+                {step === 3 && (isTireChange ? 'รายละเอียดยาง' : 'รายละเอียดบริการ')}
+                {step === 4 && 'ยืนยันข้อมูล'}
+              </p>
+            </div>
+          </div>
           {step > 1 && (
-            <button onClick={() => setStep(s => s - 1)} className="p-1 -ml-1 text-text-secondary">
-              <span className="material-symbols-outlined">arrow_back</span>
+            <button
+              onClick={() => {
+                setForm({
+                  service_type: '', license_plate: '', province: '', car_model: '', car_color: '',
+                  quantity: '4', tire_brand: '', tire_model: '', tire_size: '',
+                  price_per_unit: '', total_price: '', technician: '', notes: '', date: getToday(),
+                });
+                setStep(1);
+              }}
+              className="text-xs font-bold text-text-secondary hover:text-danger bg-surface hover:bg-danger-bg px-3 py-1.5 rounded-lg border border-border border-b-2 active:border-b transition-all"
+            >
+              กลับหน้าแรก
             </button>
           )}
-          <div>
-            <h1 className="text-lg font-bold" style={{ fontFamily: 'Manrope' }}>บันทึกบริการ</h1>
-            <p className="text-xs text-text-muted">
-              {step === 1 && 'เลือกประเภทบริการ'}
-              {step === 2 && 'ใส่ทะเบียนรถ'}
-              {step === 3 && (isTireChange ? 'รายละเอียดยาง' : 'รายละเอียดบริการ')}
-              {step === 4 && 'ยืนยันข้อมูล'}
-            </p>
-          </div>
         </div>
         {/* Progress bar */}
         <div className="flex gap-1 mt-3">
@@ -218,25 +276,45 @@ export default function QuickInput() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs text-text-muted block mb-1">จังหวัด</label>
-                  <select
-                    value={form.province}
-                    onChange={e => updateForm('province', e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-border bg-surface-dim text-sm outline-none focus:border-primary"
-                  >
-                    <option value="">เลือก...</option>
-                    {PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
-                  </select>
+                  <Select
+                    options={provinceOptions}
+                    value={provinceOptions.find(o => o.value === form.province) || null}
+                    onChange={opt => updateForm('province', opt ? opt.value : '')}
+                    placeholder="เลือก..."
+                    isClearable
+                    styles={{
+                      control: (base) => ({
+                        ...base,
+                        borderRadius: '0.75rem',
+                        borderColor: '#E2E8F0',
+                        boxShadow: 'none',
+                        fontSize: '0.875rem',
+                        '&:hover': { borderColor: '#F97316' }
+                      }),
+                      menu: (base) => ({ ...base, fontSize: '0.875rem' })
+                    }}
+                  />
                 </div>
                 <div>
                   <label className="text-xs text-text-muted block mb-1">สี</label>
-                  <select
-                    value={form.car_color}
-                    onChange={e => updateForm('car_color', e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-border bg-surface-dim text-sm outline-none focus:border-primary"
-                  >
-                    <option value="">เลือก...</option>
-                    {CAR_COLORS.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
+                  <Select
+                    options={colorOptions}
+                    value={colorOptions.find(o => o.value === form.car_color) || null}
+                    onChange={opt => updateForm('car_color', opt ? opt.value : '')}
+                    placeholder="เลือก..."
+                    isClearable
+                    styles={{
+                      control: (base) => ({
+                        ...base,
+                        borderRadius: '0.75rem',
+                        borderColor: '#E2E8F0',
+                        boxShadow: 'none',
+                        fontSize: '0.875rem',
+                        '&:hover': { borderColor: '#F97316' }
+                      }),
+                      menu: (base) => ({ ...base, fontSize: '0.875rem' })
+                    }}
+                  />
                 </div>
               </div>
               <div>
@@ -253,8 +331,7 @@ export default function QuickInput() {
 
             <button
               onClick={goToDetails}
-              disabled={!form.license_plate.trim()}
-              className="w-full py-3.5 rounded-2xl font-semibold text-white bg-gradient-to-r from-primary to-primary-dark shadow-lg shadow-primary/25 disabled:opacity-40 disabled:shadow-none transition-all active:scale-[0.98] text-sm"
+              className="w-full py-3.5 rounded-2xl font-semibold text-white bg-gradient-to-r from-primary to-primary-dark shadow-lg shadow-primary/25 transition-all active:scale-[0.98] text-sm"
             >
               ถัดไป
             </button>
@@ -270,7 +347,7 @@ export default function QuickInput() {
                 {currentServiceType?.icon}
               </span>
               <span className="font-semibold text-sm">{currentServiceType?.label}</span>
-              <span className="text-text-muted text-sm ml-auto">{form.license_plate}</span>
+              <span className="text-text-muted text-sm ml-auto">{form.license_plate || '-'}</span>
             </div>
 
             {/* Tire-specific fields */}
@@ -296,49 +373,44 @@ export default function QuickInput() {
                   </div>
                 </div>
 
-                {/* Brand */}
+                {/* Inventory Tire Select */}
                 <div>
-                  <label className="text-xs font-semibold text-text-secondary uppercase tracking-wider block mb-2">ยี่ห้อยาง *</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {TIRE_BRANDS.slice(0, 9).map(b => (
-                      <button
-                        key={b.code}
-                        onClick={() => updateForm('tire_brand', b.code)}
-                        className={`px-3 py-2.5 rounded-xl text-xs font-medium transition-all ${
-                          form.tire_brand === b.code
-                            ? 'bg-primary text-white shadow-md shadow-primary/25'
-                            : 'bg-surface-dim text-text-secondary hover:bg-border-light'
-                        }`}
-                      >
-                        {b.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Model */}
-                <div>
-                  <label className="text-xs font-semibold text-text-secondary uppercase tracking-wider block mb-2">รุ่นยาง</label>
-                  <input
-                    type="text"
-                    value={form.tire_model}
-                    onChange={e => updateForm('tire_model', e.target.value)}
-                    placeholder="เช่น Primacy 4, LT Tour"
-                    className="w-full px-3 py-2.5 rounded-xl border border-border bg-surface-dim text-sm outline-none focus:border-primary"
+                  <label className="text-xs font-semibold text-text-secondary uppercase tracking-wider block mb-2">เลือกยางจากคลัง *</label>
+                  <Select
+                    options={inventoryOptions}
+                    onChange={handleInventorySelect}
+                    placeholder="พิมพ์ค้นหายี่ห้อ ขนาด หรือรุ่นยาง..."
+                    isClearable
+                    noOptionsMessage={() => "ไม่พบข้อมูลยาง"}
+                    value={
+                      form.tire_brand && form.tire_size 
+                        ? inventoryOptions.find(o => o.item.tire_brand === form.tire_brand && o.item.tire_size === form.tire_size && o.item.tire_model === form.tire_model) || null
+                        : null
+                    }
+                    styles={{
+                      control: (base) => ({
+                        ...base,
+                        borderRadius: '0.75rem',
+                        borderColor: '#E2E8F0',
+                        boxShadow: 'none',
+                        padding: '4px',
+                        fontSize: '0.875rem',
+                        '&:hover': { borderColor: '#F97316' }
+                      }),
+                      menu: (base) => ({ ...base, fontSize: '0.875rem' }),
+                      option: (base) => ({
+                        ...base,
+                        padding: '10px 12px',
+                      })
+                    }}
                   />
-                </div>
-
-                {/* Size */}
-                <div>
-                  <label className="text-xs font-semibold text-text-secondary uppercase tracking-wider block mb-2">ขนาดยาง *</label>
-                  <select
-                    value={form.tire_size}
-                    onChange={e => updateForm('tire_size', e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-xl border border-border bg-surface-dim text-sm outline-none focus:border-primary"
-                  >
-                    <option value="">เลือกขนาด...</option>
-                    {TIRE_SIZES.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
+                  {form.tire_brand && (
+                    <div className="mt-3 bg-surface-dim p-3 rounded-xl border border-border-light flex flex-wrap gap-x-4 gap-y-2 text-sm text-text-secondary">
+                      <span><b className="text-text-primary">ยี่ห้อ:</b> {TIRE_BRANDS.find(b => b.code === form.tire_brand)?.label || form.tire_brand}</span>
+                      <span><b className="text-text-primary">ขนาด:</b> {form.tire_size}</span>
+                      <span><b className="text-text-primary">รุ่น:</b> {form.tire_model || '-'}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Price per unit */}
@@ -422,7 +494,7 @@ export default function QuickInput() {
               <div className="p-5 space-y-3 text-sm">
                 <div className="flex justify-between">
                   <span className="text-text-secondary">ทะเบียนรถ</span>
-                  <span className="font-semibold">{form.license_plate}</span>
+                  <span className="font-semibold">{form.license_plate || '-'}</span>
                 </div>
                 {form.province && (
                   <div className="flex justify-between">

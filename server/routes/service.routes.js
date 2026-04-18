@@ -108,10 +108,7 @@ router.get('/:id', (req, res) => {
  */
 router.post('/', (req, res) => {
   try {
-    const { license_plate, service_type } = req.body;
-    if (!license_plate) {
-      return res.status(400).json({ success: false, error: 'กรุณาใส่ทะเบียนรถ' });
-    }
+    const { service_type } = req.body;
     if (!service_type) {
       return res.status(400).json({ success: false, error: 'กรุณาเลือกประเภทบริการ' });
     }
@@ -151,6 +148,30 @@ router.delete('/:id', (req, res) => {
       return res.status(500).json({ success: false, error: 'ลบข้อมูลไม่สำเร็จ' });
     }
     res.json({ success: true, message: 'ลบข้อมูลสำเร็จ' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * PUT /api/services/:id
+ * Admin only — edit existing record
+ */
+router.put('/:id', requireAdmin, (req, res) => {
+  try {
+    const record = csvService.findById(req.params.id);
+    if (!record) {
+      return res.status(404).json({ success: false, error: 'ไม่พบข้อมูล' });
+    }
+    
+    // Prevent overriding critical fields accidentally
+    const updates = { ...req.body };
+    delete updates.id;
+    delete updates.created_at;
+    delete updates.created_by;
+
+    const updated = csvService.updateById(req.params.id, updates);
+    res.json({ success: true, data: updated, message: 'แก้ไขข้อมูลสำเร็จ' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

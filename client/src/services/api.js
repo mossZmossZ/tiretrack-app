@@ -16,9 +16,21 @@ async function request(method, path, body = null) {
     opts.body = JSON.stringify(body);
   }
 
-  const res = await fetch(`${BASE_URL}${path}`, opts);
-  const data = await res.json();
-  return data;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+  opts.signal = controller.signal;
+
+  try {
+    const res = await fetch(`${BASE_URL}${path}`, opts);
+    clearTimeout(timeoutId);
+    const data = await res.json();
+    return data;
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      return { success: false, error: 'หมดเวลาการเชื่อมต่อ (10 วินาที) กรุณาลองใหม่' };
+    }
+    throw err;
+  }
 }
 
 async function upload(path, file) {
@@ -59,6 +71,7 @@ async function download(path) {
 export const api = {
   get: (path) => request('GET', path),
   post: (path, body) => request('POST', path, body),
+  put: (path, body) => request('PUT', path, body),
   delete: (path) => request('DELETE', path),
   upload,
   download

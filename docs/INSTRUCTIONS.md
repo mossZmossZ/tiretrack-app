@@ -202,6 +202,12 @@ tiretrack-app/
 | GET    | `/api/services/stats`     | Admin    | Dashboard statistics           |
 | POST   | `/api/services/import`    | Admin    | Import legacy CSV              |
 | GET    | `/api/services/export`    | Admin    | Export all data as CSV         |
+| GET    | `/api/inventory`          | Any      | List all inventory (used by Tech input) |
+| POST   | `/api/inventory`          | Admin    | Create new tire model/cost price |
+| PUT    | `/api/inventory/:id`      | Admin    | Edit tire model or price       |
+| DELETE | `/api/inventory/:id`      | Admin    | Delete tire model              |
+| POST   | `/api/inventory/import`   | Admin    | Bulk Import tire inventory     |
+| GET    | `/api/inventory/export`   | Admin    | Export tire inventory          |
 
 ---
 
@@ -247,11 +253,14 @@ tiretrack-app/
 
 | Phase | Scope | Status |
 | ----- | ----- | ------ |
-| Phase 1 | CSV storage, PIN auth, Tech input, Admin log, Basic dashboard, Import/Export | 🔨 Current |
-| Phase 2 | Google Sheets integration, Advanced analytics | 📋 Planned |
-| Phase 3 | Docker/K8s deployment, Performance optimization | 📋 Planned |
+| Phase 1 | CSV storage, PIN auth, Tech input, Admin log, Basic dashboard, Import/Export | ✅ Done |
+| Phase 2 | Optional license plate feature, Data Edit features, UX improvements | ✅ Done |
+| Phase 3 | SweetAlert confirmations, Resilient API timeouts, UI polish | ✅ Done |
+| Phase 4 | Tire Inventory System, Dynamic Cost & Net Profit tracking, Inventory Import/Export | ✅ Done |
+| Phase 5 | Google Sheets integration, Advanced analytics | 📋 Planned |
+| Phase 6 | Docker/K8s deployment, Performance optimization | 📋 Planned |
 
 ---
 
-*Last updated: 2026-04-17*
+*Last updated: 2026-04-18*
 *Maintainer: Staff Software Engineer (AI)*

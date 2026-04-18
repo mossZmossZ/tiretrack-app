@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext.jsx';
 const NAV_ITEMS = [
   { to: '/admin/dashboard', icon: 'dashboard', label: 'แดชบอร์ด' },
   { to: '/admin/services', icon: 'list_alt', label: 'ประวัติบริการ' },
+  { to: '/admin/inventory', icon: 'inventory_2', label: 'ฐานข้อมูลยาง' },
   { to: '/admin/import', icon: 'upload_file', label: 'นำเข้า/ส่งออก' },
 ];
 
@@ -34,7 +35,7 @@ export default function Sidebar() {
       {/* New Service CTA */}
       <div className="px-4 pb-2">
         <button
-          onClick={() => navigate('/admin/services')}
+          onClick={() => navigate('/admin/input')}
           className="w-full py-2.5 px-4 rounded-xl font-semibold text-white bg-gradient-to-r from-primary to-primary-dark shadow-lg shadow-primary/25 hover:shadow-primary/40 hover:scale-[1.02] active:scale-[0.98] transition-all duration-150 flex items-center justify-center gap-2 text-sm"
         >
           <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>add_circle</span>
