@@ -183,6 +183,23 @@ h1, h2, h3, h4, h5, h6 {
   box-shadow: 0 0 0 2px #F97316;
 }
 
+/* Receipt print — show only the receipt, hide everything else */
+@media print {
+  body * { visibility: hidden !important; }
+  #receipt-to-print,
+  #receipt-to-print * { visibility: visible !important; }
+  #receipt-to-print {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 80mm !important;
+    padding: 4mm !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+}
+
 /* Thai license plate style */
 .license-plate {
   background: white;

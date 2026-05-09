@@ -3,6 +3,8 @@ import Select from 'react-select';
 import { SERVICE_TYPES, TIRE_BRANDS, TIRE_SIZES, CAR_COLORS, PROVINCES, QUANTITY_OPTIONS } from '../../utils/constants.js';
 import { formatCurrency, getToday } from '../../utils/formatters.js';
 import { api } from '../../services/api.js';
+import { ReceiptDocument } from '../../components/ReceiptDocument.jsx';
+import { getReceiptConfig } from '../../utils/receiptStorage.js';
 
 const provinceOptions = PROVINCES.map(p => ({ value: p, label: p }));
 const colorOptions = CAR_COLORS.map(c => ({ value: c, label: c }));
@@ -28,6 +30,7 @@ export default function QuickInput() {
   const [step, setStep] = useState(1); // 1=service type, 2=plate, 3=details, 4=confirm
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState(null);
+  const [showReceipt, setShowReceipt] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
   const [inventory, setInventory] = useState([]);
   const plateRef = useRef(null);
@@ -549,10 +552,19 @@ export default function QuickInput() {
               </div>
             </div>
 
+            {/* Print Receipt */}
+            <button
+              onClick={() => setShowReceipt(true)}
+              className="w-full mt-3 py-3 rounded-2xl font-semibold text-primary bg-white border-2 border-primary/25 hover:border-primary/60 transition-colors flex items-center justify-center gap-2 text-sm"
+            >
+              <span className="material-symbols-outlined text-lg">print</span>
+              พิมพ์ใบเสร็จ (ใบกำกับภาษีอย่างย่อ)
+            </button>
+
             <button
               onClick={handleSubmit}
               disabled={submitting}
-              className="w-full mt-4 py-3.5 rounded-2xl font-bold text-white bg-gradient-to-r from-primary to-primary-dark shadow-lg shadow-primary/25 disabled:opacity-50 transition-all active:scale-[0.98] text-sm flex items-center justify-center gap-2"
+              className="w-full mt-3 py-3.5 rounded-2xl font-bold text-white bg-gradient-to-r from-primary to-primary-dark shadow-lg shadow-primary/25 disabled:opacity-50 transition-all active:scale-[0.98] text-sm flex items-center justify-center gap-2"
             >
               {submitting ? (
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -566,6 +578,11 @@ export default function QuickInput() {
           </div>
         )}
       </div>
+
+      {/* Receipt Modal */}
+      {showReceipt && (
+        <ReceiptModal form={form} onClose={() => setShowReceipt(false)} />
+      )}
 
       {/* Toast */}
       {toast && (
@@ -586,6 +603,66 @@ export default function QuickInput() {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function ReceiptModal({ form, onClose }) {
+  const config = getReceiptConfig();
+  const receiptNumber = `TT-${(form.date || '').replace(/-/g, '')}-${String(Date.now()).slice(-4)}`;
+  const hasConfig = config.shop_name && config.tax_id;
+
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center p-4 animate-fade-in"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-slide-up sm:animate-scale-in"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Modal header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border-light">
+          <div>
+            <h3 className="font-bold text-base">ใบกำกับภาษีอย่างย่อ</h3>
+            <p className="text-xs text-text-muted mt-0.5">เลขที่ {receiptNumber}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => window.print()}
+              className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white rounded-xl text-sm font-semibold shadow-sm shadow-primary/25 hover:shadow-primary/40 active:scale-[0.97] transition-all"
+            >
+              <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>print</span>
+              พิมพ์
+            </button>
+            <button
+              onClick={onClose}
+              className="w-9 h-9 flex items-center justify-center text-text-secondary hover:bg-surface rounded-xl transition-colors"
+            >
+              <span className="material-symbols-outlined text-xl">close</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Warning if shop config is missing */}
+        {!hasConfig && (
+          <div className="mx-4 mt-3 px-3 py-2.5 bg-warning-bg border border-warning/30 rounded-xl flex items-start gap-2 text-xs text-warning">
+            <span className="material-symbols-outlined text-base shrink-0 mt-0.5">warning</span>
+            <span>ยังไม่ได้ตั้งค่าข้อมูลร้าน กรุณาไปที่ <b>Operations → ใบเสร็จ</b> เพื่อกรอกชื่อและเลขผู้เสียภาษี</span>
+          </div>
+        )}
+
+        {/* Receipt content */}
+        <div className="overflow-auto max-h-[60vh] p-4 flex justify-center">
+          <ReceiptDocument config={config} data={form} receiptNumber={receiptNumber} />
+        </div>
+      </div>
     </div>
   );
 }

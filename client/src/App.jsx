@@ -4,11 +4,13 @@ import LoginPage from './pages/LoginPage.jsx';
 import Sidebar from './components/layout/Sidebar.jsx';
 import MobileNav from './components/layout/MobileNav.jsx';
 import AdminMobileNav from './components/layout/AdminMobileNav.jsx';
+import TopHeader from './components/layout/TopHeader.jsx';
 import Dashboard from './pages/admin/Dashboard.jsx';
 import ServiceLog from './pages/admin/ServiceLog.jsx';
 import ImportExport from './pages/admin/ImportExport.jsx';
 import Inventory from './pages/admin/Inventory.jsx';
 import BackupSettings from './pages/admin/BackupSettings.jsx';
+import ReceiptSettings from './pages/admin/ReceiptSettings.jsx';
 import QuickInput from './pages/tech/QuickInput.jsx';
 import RecentEntries from './pages/tech/RecentEntries.jsx';
 
@@ -35,9 +37,12 @@ function AdminLayout() {
   return (
     <div className="flex min-h-screen bg-surface">
       <Sidebar />
-      <main className="flex-1 md:ml-64 w-full max-w-[1920px] mx-auto p-4 md:p-8 pb-24 md:pb-8">
-        <Outlet />
-      </main>
+      <div className="flex-1 md:ml-64 flex flex-col min-h-screen">
+        <TopHeader />
+        <main className="flex-1 p-4 md:p-8 pb-24 md:pb-8">
+          <Outlet />
+        </main>
+      </div>
       <AdminMobileNav />
     </div>
   );
@@ -80,6 +85,7 @@ export default function App() {
           <Route path="/admin/inventory" element={<Inventory />} />
           <Route path="/admin/import" element={<ImportExport />} />
           <Route path="/admin/backup" element={<BackupSettings />} />
+          <Route path="/admin/receipt" element={<ReceiptSettings />} />
           <Route path="/admin/input" element={<QuickInput />} />
         </Route>
       </Route>

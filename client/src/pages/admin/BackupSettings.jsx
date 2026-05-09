@@ -17,7 +17,7 @@ export default function BackupSettings() {
       if (res.success) {
         setConfig(res.data);
       }
-    } catch {}
+    } catch { }
     setLoading(false);
   };
 
@@ -58,12 +58,12 @@ export default function BackupSettings() {
       const res = await api.post('/backup/now');
       if (res.success) {
         loadConfig();
-        MySwal.fire('สำเร็จ', 'สำรองข้อมูลไปยัง S3 แล้ว', 'success');
+        MySwal.fire('สำเร็จ', 'สำรองข้อมูล แล้ว', 'success');
       } else {
         MySwal.fire('ผิดพลาด', res.error || 'เกิดข้อผิดพลาด', 'error');
       }
     } catch (err) {
-      MySwal.fire('ผิดพลาด', 'เชื่อมต่อ S3 ไม่สำเร็จ', 'error');
+      MySwal.fire('ผิดพลาด', 'เชื่อมต่อไม่สำเร็จ', 'error');
     }
     setActionLoading(false);
   };
@@ -71,7 +71,7 @@ export default function BackupSettings() {
   const handleRestore = async () => {
     const confirm = await MySwal.fire({
       title: 'กู้คืนข้อมูล?',
-      text: 'ข้อมูลปัจจุบันจะถูกแทนที่ด้วยข้อมูลจาก S3 ทั้งหมด คุณแน่ใจหรือไม่?',
+      text: 'ข้อมูลปัจจุบันจะถูกแทนที่ด้วยข้อมูลทั้งหมด คุณแน่ใจหรือไม่?',
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'กู้คืนข้อมูล',
@@ -91,12 +91,12 @@ export default function BackupSettings() {
     try {
       const res = await api.post('/backup/restore');
       if (res.success) {
-        MySwal.fire('สำเร็จ', 'กู้คืนข้อมูลจาก S3 แล้ว', 'success');
+        MySwal.fire('สำเร็จ', 'กู้คืนข้อมูลแล้ว', 'success');
       } else {
         MySwal.fire('ผิดพลาด', res.error || 'ไม่พบไฟล์สำรองหรือเกิดข้อผิดพลาด', 'error');
       }
     } catch (err) {
-      MySwal.fire('ผิดพลาด', 'เชื่อมต่อ S3 ไม่สำเร็จ', 'error');
+      MySwal.fire('ผิดพลาด', 'เชื่อมต่อ ไม่สำเร็จ', 'error');
     }
     setActionLoading(false);
   };
@@ -112,12 +112,12 @@ export default function BackupSettings() {
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
-        <h2 className="text-2xl font-bold" style={{ fontFamily: 'Manrope' }}>สำรองข้อมูล (S3 Backup)</h2>
+        <h2 className="text-2xl font-bold" style={{ fontFamily: 'Manrope' }}>สำรองข้อมูล (Backup)</h2>
         <p className="text-sm text-text-secondary mt-1">ตั้งค่าการสำรองข้อมูลอัตโนมัติและกู้คืน</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
+
         {/* Settings Card */}
         <div className="bg-white rounded-2xl p-6 border border-border-light shadow-sm">
           <div className="flex items-center gap-3 mb-6">
@@ -126,7 +126,7 @@ export default function BackupSettings() {
             </div>
             <div>
               <h3 className="font-bold text-sm" style={{ fontFamily: 'Manrope' }}>การสำรองข้อมูลอัตโนมัติ</h3>
-              <p className="text-xs text-text-muted">สำรองไปยัง MinIO S3 ตามเวลาที่กำหนด</p>
+              <p className="text-xs text-text-muted">สำรองไปยัง Backup ตามเวลาที่กำหนด</p>
             </div>
           </div>
 
@@ -136,11 +136,11 @@ export default function BackupSettings() {
                 <p className="font-semibold text-sm">เปิดใช้งาน Auto Backup</p>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
-                <input 
-                  type="checkbox" 
-                  className="sr-only peer" 
+                <input
+                  type="checkbox"
+                  className="sr-only peer"
                   checked={config?.autoEnabled || false}
-                  onChange={e => setConfig({...config, autoEnabled: e.target.checked})}
+                  onChange={e => setConfig({ ...config, autoEnabled: e.target.checked })}
                 />
                 <div className="w-11 h-6 bg-surface-dim peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
               </label>
@@ -149,9 +149,9 @@ export default function BackupSettings() {
             {config?.autoEnabled && (
               <div>
                 <label className="text-xs font-semibold text-text-secondary mb-1 block">ความถี่ (Schedule)</label>
-                <select 
+                <select
                   value={config.schedule}
-                  onChange={e => setConfig({...config, schedule: e.target.value})}
+                  onChange={e => setConfig({ ...config, schedule: e.target.value })}
                   className="w-full px-3 py-2 rounded-xl border border-border bg-surface-dim outline-none focus:border-primary text-sm"
                 >
                   <option value="0 * * * *">รายชั่วโมง (ทุกต้นชั่วโมง)</option>
@@ -162,8 +162,8 @@ export default function BackupSettings() {
               </div>
             )}
 
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               disabled={saving}
               className="w-full py-2.5 rounded-xl font-semibold text-white bg-text-primary hover:bg-black transition-colors text-sm"
             >
@@ -196,7 +196,7 @@ export default function BackupSettings() {
           </div>
 
           <div className="mt-auto grid grid-cols-2 gap-3">
-            <button 
+            <button
               onClick={handleBackupNow}
               disabled={actionLoading}
               className="flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-white bg-primary hover:bg-primary-dark transition-colors text-sm"
@@ -204,7 +204,7 @@ export default function BackupSettings() {
               <span className="material-symbols-outlined text-lg">backup</span>
               สำรองทันที
             </button>
-            <button 
+            <button
               onClick={handleRestore}
               disabled={actionLoading}
               className="flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-danger bg-danger-bg hover:bg-red-100 transition-colors text-sm"
