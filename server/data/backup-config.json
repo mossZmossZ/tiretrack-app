@@ -1,5 +1,5 @@
 {
-  "autoEnabled": false,
+  "autoEnabled": true,
   "schedule": "0 2 * * *",
   "lastBackup": null,
   "lastStatus": null
