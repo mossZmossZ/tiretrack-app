@@ -1,23 +1,8 @@
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { v4 as uuidv4 } from 'uuid';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = path.resolve(__dirname, '../data');
-const CSV_PATH = path.join(DATA_DIR, 'inventory.csv');
+import { Inventory } from '../models/Inventory.model.js';
 
 const HEADERS = ['id', 'tire_brand', 'tire_size', 'tire_model', 'cost_price', 'created_at'];
 const HEADER_LINE = HEADERS.join(',');
-
-function ensureFile() {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
-  if (!fs.existsSync(CSV_PATH)) {
-    fs.writeFileSync(CSV_PATH, HEADER_LINE + '\n', 'utf-8');
-  }
-}
 
 function escapeCSV(val) {
   if (val === null || val === undefined) return '';
@@ -58,84 +43,63 @@ function parseCSVLine(line) {
   return values;
 }
 
-export function readAll() {
-  ensureFile();
-  const content = fs.readFileSync(CSV_PATH, 'utf-8');
-  const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
-  if (lines.length <= 1) return [];
-
-  const records = [];
-  for (let i = 1; i < lines.length; i++) {
-    const vals = parseCSVLine(lines[i]);
-    const obj = {};
-    HEADERS.forEach((h, idx) => {
-      obj[h] = vals[idx] || '';
-    });
-    records.push(obj);
-  }
-  return records;
+function toRecord({ _id, __v, ...rest }) {
+  return { id: _id, ...rest };
 }
 
-export function create(data) {
-  ensureFile();
+export async function readAll() {
+  const docs = await Inventory.find({}).lean();
+  return docs.map(toRecord);
+}
+
+export async function create(data) {
   const id = uuidv4();
-  const now = new Date().toISOString();
-  
   const record = {
-    id,
+    _id: id,
     tire_brand: data.tire_brand || '',
     tire_size: data.tire_size || '',
     tire_model: data.tire_model || '',
     cost_price: data.cost_price || '0',
-    created_at: now
+    created_at: new Date().toISOString()
   };
-
-  const line = HEADERS.map(h => escapeCSV(record[h])).join(',');
-  fs.appendFileSync(CSV_PATH, line + '\n', 'utf-8');
-  return record;
+  await Inventory.create(record);
+  return toRecord(record);
 }
 
-export function findById(id) {
-  const all = readAll();
-  return all.find(r => r.id === id) || null;
+export async function findById(id) {
+  const doc = await Inventory.findById(id).lean();
+  return doc ? toRecord(doc) : null;
 }
 
-export function updateById(id, updates) {
-  ensureFile();
-  const all = readAll();
-  const idx = all.findIndex(r => r.id === id);
-  if (idx === -1) return null;
+export async function updateById(id, updates) {
+  const doc = await Inventory.findById(id).lean();
+  if (!doc) return null;
 
-  all[idx] = { ...all[idx], ...updates };
+  const merged = { ...doc, ...updates };
+  delete merged._id;
+  delete merged.__v;
 
+  await Inventory.findByIdAndUpdate(id, merged);
+  return toRecord({ _id: id, ...merged });
+}
+
+export async function deleteById(id) {
+  const result = await Inventory.findByIdAndDelete(id);
+  return result !== null;
+}
+
+// Export all inventory as CSV string
+export async function getCSVContent() {
+  const all = await readAll();
   const lines = [HEADER_LINE];
   all.forEach(record => {
     lines.push(HEADERS.map(h => escapeCSV(record[h])).join(','));
   });
-  fs.writeFileSync(CSV_PATH, lines.join('\n') + '\n', 'utf-8');
-  return all[idx];
+  return lines.join('\n') + '\n';
 }
 
-export function deleteById(id) {
-  ensureFile();
-  const all = readAll();
-  const authRecords = all.filter(r => r.id !== id);
-  if (all.length === authRecords.length) return false;
-
-  const lines = [HEADER_LINE];
-  authRecords.forEach(record => {
-    lines.push(HEADERS.map(h => escapeCSV(record[h])).join(','));
-  });
-  fs.writeFileSync(CSV_PATH, lines.join('\n') + '\n', 'utf-8');
-  return true;
-}
-
-export function getCSVContent() {
-  ensureFile();
-  return fs.readFileSync(CSV_PATH, 'utf-8');
-}
-
-export function importLegacy(csvContent) {
+// Import legacy inventory CSV (tire_brand, tire_size, tire_model, cost_price)
+export async function importLegacy(csvContent) {
   const lines = csvContent.split('\n').filter(l => l.trim());
   let imported = 0;
   let skipped = 0;
@@ -144,31 +108,20 @@ export function importLegacy(csvContent) {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     if (!line) continue;
-    
-    if (line.includes('ยี่ห้อ') || line.includes('tire_brand')) {
-      // skip header
-      continue;
-    }
+    if (line.includes('ยี่ห้อ') || line.includes('tire_brand')) continue;
 
-    const values = line.includes('\t') 
-      ? line.split('\t').map(v => v.trim()) 
+    const values = line.includes('\t')
+      ? line.split('\t').map(v => v.trim())
       : parseCSVLine(line);
 
-    if (values.length < 2) {
-      skipped++;
-      continue;
-    }
+    if (values.length < 2) { skipped++; continue; }
 
     try {
       const tire_brand = values[0]?.trim() || '';
       const tire_size = values[1]?.trim() || '';
       const tire_model = values[2]?.trim() || '';
-      let cost_price = '0';
-      if (values[3]) {
-        cost_price = values[3].replace(/[,฿\s]/g, '').trim();
-      }
-
-      create({ tire_brand, tire_size, tire_model, cost_price });
+      const cost_price = values[3] ? values[3].replace(/[,฿\s]/g, '').trim() : '0';
+      await create({ tire_brand, tire_size, tire_model, cost_price });
       imported++;
     } catch (err) {
       skipped++;
@@ -177,4 +130,31 @@ export function importLegacy(csvContent) {
   }
 
   return { imported, skipped, errors };
+}
+
+// Used by backup restore: clear collection and reimport from current-format CSV
+export async function importCurrentCSV(csvContent) {
+  const lines = csvContent.split('\n').filter(l => l.trim());
+  await Inventory.deleteMany({});
+  if (lines.length <= 1) return;
+
+  const docs = [];
+  for (let i = 1; i < lines.length; i++) {
+    const values = parseCSVLine(lines[i]);
+    const record = {};
+    HEADERS.forEach((h, idx) => { record[h] = values[idx] || ''; });
+    if (!record.id) continue;
+    docs.push({
+      _id: record.id,
+      tire_brand: record.tire_brand,
+      tire_size: record.tire_size,
+      tire_model: record.tire_model,
+      cost_price: record.cost_price,
+      created_at: record.created_at
+    });
+  }
+
+  if (docs.length > 0) {
+    await Inventory.insertMany(docs, { ordered: false });
+  }
 }

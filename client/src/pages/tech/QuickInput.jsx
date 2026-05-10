@@ -115,9 +115,12 @@ export default function QuickInput() {
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
-      const res = await api.post('/services', form);
+      const res = await api.post('/services', {
+        ...form,
+        receipt_config: getReceiptConfig(),
+      });
       if (res.success) {
-        setToast({ id: res.data.id, message: 'บันทึกสำเร็จ!' });
+        setToast({ id: res.data.id, receiptNumber: res.data.receiptNumber, message: 'บันทึกสำเร็จ!' });
         // Reset form
         setForm({
           service_type: '', license_plate: '', province: '', car_model: '', car_color: '',
@@ -586,13 +589,18 @@ export default function QuickInput() {
 
       {/* Toast */}
       {toast && (
-        <div className={`fixed bottom-20 left-1/2 -translate-x-1/2 animate-toast z-50 ${
+        <div className={`fixed top-4 left-1/2 -translate-x-1/2 animate-toast z-50 w-[calc(100%-2rem)] max-w-sm ${
           toast.error ? 'bg-danger' : toast.undone ? 'bg-text-secondary' : 'bg-success'
-        } text-white px-5 py-3 rounded-2xl shadow-xl flex items-center gap-3 min-w-[280px]`}>
+        } text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-3`}>
           <span className="material-symbols-outlined text-lg">
             {toast.error ? 'error' : toast.undone ? 'undo' : 'check_circle'}
           </span>
-          <span className="text-sm font-medium flex-1">{toast.message}</span>
+          <div className="flex-1">
+            <p className="text-sm font-medium">{toast.message}</p>
+            {toast.receiptNumber && (
+              <p className="text-xs opacity-80 mt-0.5">เลขที่: {toast.receiptNumber}</p>
+            )}
+          </div>
           {toast.id && !toast.undone && (
             <button
               onClick={handleUndo}

@@ -11,6 +11,8 @@ server/data/*.csv
 # Build output
 client/dist/
 
+# AI
+.claude/
 # IDE
 .vscode/
 .idea/
@@ -24,3 +26,4 @@ Thumbs.db
 
 # Stitch fetch (design tool artifacts)
 stitch-fetch/
+

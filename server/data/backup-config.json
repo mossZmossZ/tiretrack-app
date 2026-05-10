@@ -1,6 +1,6 @@
 {
   "autoEnabled": true,
   "schedule": "0 2 * * *",
-  "lastBackup": null,
-  "lastStatus": null
+  "lastBackup": "2026-05-10T07:59:11.510Z",
+  "lastStatus": "success"
 }
