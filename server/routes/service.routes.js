@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import multer from 'multer';
+import { v4 as uuidv4 } from 'uuid';
 import { requireAuth, requireAdmin } from '../middleware/auth.middleware.js';
 import * as csvService from '../services/csv.service.js';
 import { generateReceiptNumber, saveReceiptToS3 } from '../services/receipt.service.js';
+import { RecycleBin } from '../models/RecycleBin.model.js';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -120,11 +122,15 @@ router.delete('/:id', async (req, res) => {
       }
     }
 
+    const recordData = record.toObject ? record.toObject() : { ...record };
+    const { __v, ...cleanData } = recordData;
+    await RecycleBin.create({ _id: uuidv4(), type: 'service', data: cleanData });
+
     const deleted = await csvService.deleteById(req.params.id);
     if (!deleted) {
       return res.status(500).json({ success: false, error: 'ลบข้อมูลไม่สำเร็จ' });
     }
-    res.json({ success: true, message: 'ลบข้อมูลสำเร็จ' });
+    res.json({ success: true, message: 'ย้ายไปถังขยะสำเร็จ' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

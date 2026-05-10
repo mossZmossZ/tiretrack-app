@@ -11,6 +11,7 @@ import ImportExport from './pages/admin/ImportExport.jsx';
 import Inventory from './pages/admin/Inventory.jsx';
 import BackupSettings from './pages/admin/BackupSettings.jsx';
 import ReceiptSettings from './pages/admin/ReceiptSettings.jsx';
+import RecycleBin from './pages/admin/RecycleBin.jsx';
 import QuickInput from './pages/tech/QuickInput.jsx';
 import RecentEntries from './pages/tech/RecentEntries.jsx';
 
@@ -86,6 +87,7 @@ export default function App() {
           <Route path="/admin/import" element={<ImportExport />} />
           <Route path="/admin/backup" element={<BackupSettings />} />
           <Route path="/admin/receipt" element={<ReceiptSettings />} />
+          <Route path="/admin/recycle" element={<RecycleBin />} />
           <Route path="/admin/input" element={<QuickInput />} />
         </Route>
       </Route>

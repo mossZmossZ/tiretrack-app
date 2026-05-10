@@ -1,7 +1,9 @@
 import express from 'express';
 import multer from 'multer';
+import { v4 as uuidv4 } from 'uuid';
 import * as inventoryService from '../services/inventory.service.js';
 import { requireAdmin, requireAuth } from '../middleware/auth.middleware.js';
+import { RecycleBin } from '../models/RecycleBin.model.js';
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -54,12 +56,15 @@ router.put('/:id', requireAdmin, async (req, res) => {
 
 router.delete('/:id', requireAdmin, async (req, res) => {
   try {
-    const success = await inventoryService.deleteById(req.params.id);
-    if (success) {
-      res.json({ success: true });
-    } else {
-      res.status(404).json({ success: false, error: 'ไม่พบข้อมูล' });
-    }
+    const record = await inventoryService.findById(req.params.id);
+    if (!record) return res.status(404).json({ success: false, error: 'ไม่พบข้อมูล' });
+
+    const recordData = record.toObject ? record.toObject() : { ...record };
+    const { __v, ...cleanData } = recordData;
+    await RecycleBin.create({ _id: uuidv4(), type: 'inventory', data: cleanData });
+
+    await inventoryService.deleteById(req.params.id);
+    res.json({ success: true, message: 'ย้ายไปถังขยะสำเร็จ' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

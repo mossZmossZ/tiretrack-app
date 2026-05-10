@@ -43,7 +43,7 @@ export default function ServiceLog() {
   const handleDelete = async (id) => {
     const result = await MySwal.fire({
       title: 'ต้องการลบรายการนี้ใช่ไหม?',
-      text: "คุณจะไม่สามารถกู้คืนข้อมูลนี้ได้!",
+      text: 'รายการจะถูกย้ายไปถังขยะ และจะถูกลบออกอัตโนมัติใน 1 วัน',
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#F97316',
@@ -57,7 +57,7 @@ export default function ServiceLog() {
         const res = await api.delete(`/services/${id}`);
         if (res.success) {
           setRecords(r => r.filter(rec => rec.id !== id));
-          MySwal.fire({ title: 'ลบสำเร็จ!', icon: 'success', confirmButtonColor: '#F97316' });
+          MySwal.fire({ title: 'ย้ายไปถังขยะแล้ว!', icon: 'success', confirmButtonColor: '#F97316' });
         } else {
           MySwal.fire({ title: 'ผิดพลาด', text: res.error, icon: 'error', confirmButtonColor: '#F97316' });
         }

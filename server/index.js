@@ -8,6 +8,7 @@ import authRoutes from './routes/auth.routes.js';
 import serviceRoutes from './routes/service.routes.js';
 import inventoryRoutes from './routes/inventory.routes.js';
 import backupRoutes from './routes/backup.routes.js';
+import recycleRoutes from './routes/recycle.routes.js';
 import { initAutoBackup } from './services/backup.service.js';
 
 dotenv.config({ path: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../.env') });
@@ -23,6 +24,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/backup', backupRoutes);
+app.use('/api/recycle', recycleRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ success: true, message: 'TireTrack API is running', time: new Date().toISOString() });
