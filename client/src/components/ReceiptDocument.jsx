@@ -1,4 +1,4 @@
-import { TIRE_BRANDS, SERVICE_TYPE_MAP } from '../utils/constants.js';
+import { SERVICE_TYPE_MAP } from '../utils/constants.js';
 import { formatCurrency, formatDate } from '../utils/formatters.js';
 
 export function ReceiptDocument({ config, data, receiptNumber }) {
@@ -6,7 +6,7 @@ export function ReceiptDocument({ config, data, receiptNumber }) {
   const vatAmount = config.vat_registered ? Math.round(total * 7 / 107) : 0;
   const subtotal = total - vatAmount;
 
-  const brandLabel = TIRE_BRANDS.find(b => b.code === data.tire_brand)?.label || data.tire_brand || '';
+  const brandCode = data.tire_brand || '';
   const serviceLabel = SERVICE_TYPE_MAP[data.service_type]?.label || data.service_type || '';
   const isTireChange = data.service_type === 'tire_change';
 
@@ -72,7 +72,7 @@ export function ReceiptDocument({ config, data, receiptNumber }) {
         {isTireChange && (
           <>
             <div style={{ fontSize: '10px', color: '#333' }}>
-              {[brandLabel, data.tire_model, data.tire_size].filter(Boolean).join(' / ')}
+              {[brandCode, data.tire_model, data.tire_size].filter(Boolean).join(' / ')}
             </div>
             <div style={{ ...rowStyle }}>
               <span style={{ fontSize: '10px' }}>

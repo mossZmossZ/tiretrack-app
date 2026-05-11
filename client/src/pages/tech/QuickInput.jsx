@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import Select from 'react-select';
-import { SERVICE_TYPES, TIRE_BRANDS, TIRE_SIZES, CAR_COLORS, PROVINCES, QUANTITY_OPTIONS } from '../../utils/constants.js';
+import { SERVICE_TYPES, TIRE_SIZES, CAR_COLORS, PROVINCES, QUANTITY_OPTIONS } from '../../utils/constants.js';
 import { formatCurrency, getToday } from '../../utils/formatters.js';
 import { api } from '../../services/api.js';
 import { ReceiptDocument } from '../../components/ReceiptDocument.jsx';
@@ -151,8 +151,7 @@ export default function QuickInput() {
   };
 
   const inventoryOptions = inventory.map(item => {
-    const brandLabel = TIRE_BRANDS.find(b => b.code === item.tire_brand)?.label || item.tire_brand;
-    const desc = [brandLabel, item.tire_size, item.tire_model].filter(Boolean).join(' | ');
+    const desc = [item.tire_brand, item.tire_size, item.tire_model].filter(Boolean).join(' | ');
     return {
       value: item.id,
       label: `${desc} (ต้นทุน: ${formatCurrency(item.cost_price)})`,
@@ -412,7 +411,7 @@ export default function QuickInput() {
                   />
                   {form.tire_brand && (
                     <div className="mt-3 bg-surface-dim p-3 rounded-xl border border-border-light flex flex-wrap gap-x-4 gap-y-2 text-sm text-text-secondary">
-                      <span><b className="text-text-primary">ยี่ห้อ:</b> {TIRE_BRANDS.find(b => b.code === form.tire_brand)?.label || form.tire_brand}</span>
+                      <span><b className="text-text-primary">ยี่ห้อ:</b> {form.tire_brand}</span>
                       <span><b className="text-text-primary">ขนาด:</b> {form.tire_size}</span>
                       <span><b className="text-text-primary">รุ่น:</b> {form.tire_model || '-'}</span>
                     </div>
@@ -529,7 +528,7 @@ export default function QuickInput() {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-text-secondary">ยี่ห้อ / รุ่น</span>
-                      <span>{TIRE_BRANDS.find(b => b.code === form.tire_brand)?.label} {form.tire_model}</span>
+                      <span>{form.tire_brand} {form.tire_model}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-text-secondary">ขนาด</span>

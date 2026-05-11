@@ -1,5 +1,183 @@
 import { v4 as uuidv4 } from 'uuid';
 import { Service } from '../models/Service.model.js';
+import { Inventory } from '../models/Inventory.model.js';
+
+const PROVINCE_SUFFIX_MAP = {
+  'กรุงเทพมหานคร': 'กรุงเทพมหานคร',
+  'กทม': 'กรุงเทพมหานคร',
+  'กท': 'กรุงเทพมหานคร',
+  'กทส': 'กรุงเทพมหานคร',
+  'เพชรบูรณ์': 'เพชรบูรณ์',
+  'พช': 'เพชรบูรณ์',
+  'นครสวรรค์': 'นครสวรรค์',
+  'นครสวรรค': 'นครสวรรค์',
+  'นครสวร': 'นครสวรรค์',
+  'นครราชสีมา': 'นครราชสีมา',
+  'นครราช': 'นครราชสีมา',
+  'นครราชสี': 'นครราชสีมา',
+  'นครราชส': 'นครราชสีมา',
+  'นม': 'นครราชสีมา',
+  'พิษณุโลก': 'พิษณุโลก',
+  'พิษณูโลก': 'พิษณุโลก',
+  'พล': 'พิษณุโลก',
+  'ชัยภูมิ': 'ชัยภูมิ',
+  'ชภ': 'ชัยภูมิ',
+  'ชัภูมิ': 'ชัยภูมิ',
+  'ชย': 'ชัยภูมิ',
+  'เชียงใหม่': 'เชียงใหม่',
+  'ชม': 'เชียงใหม่',
+  'เชียงราย': 'เชียงราย',
+  'ชร': 'เชียงราย',
+  'ขอนแก่น': 'ขอนแก่น',
+  'ขอน': 'ขอนแก่น',
+  'ขอนแ่น': 'ขอนแก่น',
+  'ขก': 'ขอนแก่น',
+  'ชลบุรี': 'ชลบุรี',
+  'ชล': 'ชลบุรี',
+  'ลำพูน': 'ลำพูน',
+  'ลำพู': 'ลำพูน',
+  'มหาสารคาม': 'มหาสารคาม',
+  'มหาสาราคาม': 'มหาสารคาม',
+  'สารคาม': 'มหาสารคาม',
+  'สุโขทัย': 'สุโขทัย',
+  'อุตรดิตถ์': 'อุตรดิตถ์',
+  'อุตรดิต': 'อุตรดิตถ์',
+  'พิจิตร': 'พิจิตร',
+  'นครปฐม': 'นครปฐม',
+  'นฐ': 'นครปฐม',
+  'นครพนม': 'นครพนม',
+  'นพ': 'นครพนม',
+  'กาญจนบุรี': 'กาญจนบุรี',
+  'กาญบุรี': 'กาญจนบุรี',
+  'กาญ': 'กาญจนบุรี',
+  'กำแพงเพชร': 'กำแพงเพชร',
+  'กำแพง': 'กำแพงเพชร',
+  'ตาก': 'ตาก',
+  'เลย': 'เลย',
+  'อุดรธานี': 'อุดรธานี',
+  'อุดร': 'อุดรธานี',
+  'อุด': 'อุดรธานี',
+  'น่าน': 'น่าน',
+  'แพร่': 'แพร่',
+  'พะเยา': 'พะเยา',
+  'แม่ฮ่องสอน': 'แม่ฮ่องสอน',
+  'ลำปาง': 'ลำปาง',
+  'ลป': 'ลำปาง',
+  'อุบลราชธานี': 'อุบลราชธานี',
+  'อุบล': 'อุบลราชธานี',
+  'อบ': 'อุบลราชธานี',
+  'ศรีสะเกษ': 'ศรีสะเกษ',
+  'ศก': 'ศรีสะเกษ',
+  'สุรินทร์': 'สุรินทร์',
+  'สร': 'สุรินทร์',
+  'บุรีรัมย์': 'บุรีรัมย์',
+  'บร': 'บุรีรัมย์',
+  'ร้อยเอ็ด': 'ร้อยเอ็ด',
+  'รอ': 'ร้อยเอ็ด',
+  'กาฬสินธุ์': 'กาฬสินธุ์',
+  'กาฬสิน': 'กาฬสินธุ์',
+  'กาสิน': 'กาฬสินธุ์',
+  'กสิน': 'กาฬสินธุ์',
+  'กส': 'กาฬสินธุ์',
+  'ยโสธร': 'ยโสธร',
+  'นครนายก': 'นครนายก',
+  'นย': 'นครนายก',
+  'ปราจีนบุรี': 'ปราจีนบุรี',
+  'ปจ': 'ปราจีนบุรี',
+  'สระแก้ว': 'สระแก้ว',
+  'สก': 'สระแก้ว',
+  'ฉะเชิงเทรา': 'ฉะเชิงเทรา',
+  'ฉะเชิง': 'ฉะเชิงเทรา',
+  'ฉช': 'ฉะเชิงเทรา',
+  'จันทบุรี': 'จันทบุรี',
+  'จัน': 'จันทบุรี',
+  'จบ': 'จันทบุรี',
+  'ระยอง': 'ระยอง',
+  'รย': 'ระยอง',
+  'ตราด': 'ตราด',
+  'ตร': 'ตราด',
+  'ปทุมธานี': 'ปทุมธานี',
+  'ปทุม': 'ปทุมธานี',
+  'ปท': 'ปทุมธานี',
+  'สมุทรปราการ': 'สมุทรปราการ',
+  'สป': 'สมุทรปราการ',
+  'สมุทรสาคร': 'สมุทรสาคร',
+  'สค': 'สมุทรสาคร',
+  'สมุทรสงคราม': 'สมุทรสงคราม',
+  'สส': 'สมุทรสงคราม',
+  'นนทบุรี': 'นนทบุรี',
+  'นบ': 'นนทบุรี',
+  'พระนครศรีอยุธยา': 'พระนครศรีอยุธยา',
+  'อยุธยา': 'พระนครศรีอยุธยา',
+  'อย': 'พระนครศรีอยุธยา',
+  'อ่างทอง': 'อ่างทอง',
+  'สิงห์บุรี': 'สิงห์บุรี',
+  'ลพบุรี': 'ลพบุรี',
+  'ลบ': 'ลพบุรี',
+  'สระบุรี': 'สระบุรี',
+  'สห': 'สระบุรี',
+  'ราชบุรี': 'ราชบุรี',
+  'รบ': 'ราชบุรี',
+  'สุพรรณบุรี': 'สุพรรณบุรี',
+  'สพ': 'สุพรรณบุรี',
+  'ประจวบคีรีขันธ์': 'ประจวบคีรีขันธ์',
+  'ประจวบ': 'ประจวบคีรีขันธ์',
+  'ปข': 'ประจวบคีรีขันธ์',
+  'เพชรบุรี': 'เพชรบุรี',
+  'พบ': 'เพชรบุรี',
+  'ชุมพร': 'ชุมพร',
+  'ระนอง': 'ระนอง',
+  'สุราษฎร์ธานี': 'สุราษฎร์ธานี',
+  'สุราษฎร์': 'สุราษฎร์ธานี',
+  'นครศรีธรรมราช': 'นครศรีธรรมราช',
+  'นครศรี': 'นครศรีธรรมราช',
+  'นศ': 'นครศรีธรรมราช',
+  'พัทลุง': 'พัทลุง',
+  'สงขลา': 'สงขลา',
+  'สข': 'สงขลา',
+  'กระบี่': 'กระบี่',
+  'กบ': 'กระบี่',
+  'ตรัง': 'ตรัง',
+  'พังงา': 'พังงา',
+  'ภูเก็ต': 'ภูเก็ต',
+  'สตูล': 'สตูล',
+  'ยะลา': 'ยะลา',
+  'ปัตตานี': 'ปัตตานี',
+  'นราธิวาส': 'นราธิวาส',
+  'นธ': 'นราธิวาส',
+  'หนองคาย': 'หนองคาย',
+  'นค': 'หนองคาย',
+  'บึงกาฬ': 'บึงกาฬ',
+  'สกลนคร': 'สกลนคร',
+  'นครพนม': 'นครพนม',
+  'มุกดาหาร': 'มุกดาหาร',
+  'อำนาจเจริญ': 'อำนาจเจริญ',
+  'อจ': 'อำนาจเจริญ',
+};
+
+const PROVINCE_SUFFIXES = Object.keys(PROVINCE_SUFFIX_MAP)
+  .sort((a, b) => b.length - a.length);
+
+function extractProvince(plateStr) {
+  if (!plateStr) return { plate: '', province: '' };
+  const trimmed = plateStr.trim();
+  for (const suffix of PROVINCE_SUFFIXES) {
+    if (trimmed.endsWith(suffix)) {
+      return {
+        plate: trimmed.slice(0, -suffix.length),
+        province: PROVINCE_SUFFIX_MAP[suffix]
+      };
+    }
+  }
+  return { plate: trimmed, province: '' };
+}
+
+function cleanNone(val) {
+  if (!val) return '';
+  const cleaned = val.trim();
+  if (cleaned === 'none' || cleaned === 'None' || cleaned === 'NONE') return '';
+  return cleaned;
+}
 
 const HEADERS = [
   'id', 'date', 'license_plate', 'province', 'car_model', 'car_color',
@@ -177,8 +355,24 @@ export async function importLegacy(csvContent) {
   const lines = csvContent.split('\n').filter(l => l.trim());
   if (lines.length <= 1) return { imported: 0, skipped: 0, errors: [] };
 
+  // Pre-load all inventory into a lookup map: brand|size|model => cost_price
+  const inventoryMap = new Map();
+  try {
+    const inventoryDocs = await Inventory.find({}).lean();
+    for (const item of inventoryDocs) {
+      const key = `${item.tire_brand || ''}|${item.tire_size || ''}|${item.tire_model || ''}`.toLowerCase();
+      if (item.tire_brand && item.tire_size && item.cost_price) {
+        inventoryMap.set(key, item.cost_price);
+      }
+    }
+  } catch (e) {
+    // Inventory lookup is best-effort; continue without it
+    console.warn('[importLegacy] Could not load inventory for cost_price lookup:', e.message);
+  }
+
   let imported = 0;
   let skipped = 0;
+  let matched = 0;
   const errors = [];
 
   for (let i = 1; i < lines.length; i++) {
@@ -195,34 +389,42 @@ export async function importLegacy(csvContent) {
       }
 
       const plateRaw = values[1]?.trim() || '';
-      let plate = plateRaw;
-      let province = '';
-      if (plateRaw.endsWith('กทม')) {
-        plate = plateRaw.slice(0, -3);
-        province = 'กรุงเทพมหานคร';
-      } else if (plateRaw.endsWith('พช')) {
-        plate = plateRaw.slice(0, -2);
-        province = 'เพชรบูรณ์';
-      }
+      const { plate, province } = extractProvince(plateRaw);
 
       const priceStr = (values[8] || '').replace(/[,฿\s]/g, '').trim();
       const price = Number(priceStr) || 0;
       const qty = Number(values[4]?.trim()) || 0;
 
+      const tireBrand = cleanNone(values[5]?.trim() || '');
+      const tireModel = cleanNone(values[6]?.trim() || '');
+      const tireSize = cleanNone(values[7]?.trim() || '');
+
+      // Look up cost_price from inventory
+      let costPrice = '0';
+      if (tireBrand && tireSize) {
+        const lookupKey = `${tireBrand}|${tireSize}|${tireModel}`.toLowerCase();
+        const found = inventoryMap.get(lookupKey);
+        if (found) {
+          costPrice = found;
+          matched++;
+        }
+      }
+
       await create({
         date,
-        license_plate: plate || plateRaw,
+        license_plate: cleanNone(plate || plateRaw),
         province,
-        car_model: values[2]?.trim() || '',
-        car_color: values[3]?.trim() || '',
+        car_model: cleanNone(values[2]?.trim() || ''),
+        car_color: cleanNone(values[3]?.trim() || ''),
         service_type: 'tire_change',
         quantity: String(qty),
-        tire_brand: values[5]?.trim() || '',
-        tire_model: values[6]?.trim() || '',
-        tire_size: values[7]?.trim() || '',
+        tire_brand: tireBrand,
+        tire_model: tireModel,
+        tire_size: tireSize,
         price_per_unit: String(price),
         total_price: String(qty * price),
-        notes: values[9]?.trim() || ''
+        cost_price: costPrice,
+        notes: cleanNone(values[9]?.trim() || '')
       }, 'admin');
 
       imported++;
@@ -232,7 +434,7 @@ export async function importLegacy(csvContent) {
     }
   }
 
-  return { imported, skipped, errors };
+  return { imported, skipped, matched, errors };
 }
 
 // Export all records as CSV string

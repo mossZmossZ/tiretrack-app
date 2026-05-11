@@ -92,7 +92,11 @@ export default function RecentEntries() {
                     </div>
                     {record.service_type === 'tire_change' && record.tire_brand && (
                       <p className="text-xs text-text-muted mt-1">
-                        {record.tire_brand} {record.tire_model} {record.tire_size} × {record.quantity}
+                        {record.tire_brand}
+                        {record.tire_model ? ` ${record.tire_model}` : ''}
+                        {record.tire_size ? ` (${record.tire_size})` : ''}
+                        {record.quantity ? ` × ${record.quantity}` : ''}
+                        {record.cost_price && Number(record.cost_price) > 0 ? ` · ต้นทุน ${formatCurrency(record.cost_price)}` : ''}
                       </p>
                     )}
                     <div className="flex items-center justify-between mt-2">

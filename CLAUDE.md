@@ -1,91 +1,203 @@
 # CLAUDE.md
 
-Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
+## Quick Commands
 
-## 1. Think Before Coding
-
-**Don't assume. Don't hide confusion. Surface tradeoffs.**
-
-Before implementing:
-- State your assumptions explicitly. If uncertain, ask.
-- If multiple interpretations exist, present them - don't pick silently.
-- If a simpler approach exists, say so. Push back when warranted.
-- If something is unclear, stop. Name what's confusing. Ask.
-
-## 2. Simplicity First
-
-**Minimum code that solves the problem. Nothing speculative.**
-
-- No features beyond what was asked.
-- No abstractions for single-use code.
-- No "flexibility" or "configurability" that wasn't requested.
-- No error handling for impossible scenarios.
-- If you write 200 lines and it could be 50, rewrite it.
-
-Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
-
-## 3. Surgical Changes
-
-**Touch only what you must. Clean up only your own mess.**
-
-When editing existing code:
-- Don't "improve" adjacent code, comments, or formatting.
-- Don't refactor things that aren't broken.
-- Match existing style, even if you'd do it differently.
-- If you notice unrelated dead code, mention it - don't delete it.
-
-When your changes create orphans:
-- Remove imports/variables/functions that YOUR changes made unused.
-- Don't remove pre-existing dead code unless asked.
-
-The test: Every changed line should trace directly to the user's request.
-
-## 4. Goal-Driven Execution
-
-**Define success criteria. Loop until verified.**
-
-Transform tasks into verifiable goals:
-- "Add validation" → "Write tests for invalid inputs, then make them pass"
-- "Fix the bug" → "Write a test that reproduces it, then make it pass"
-- "Refactor X" → "Ensure tests pass before and after"
-
-For multi-step tasks, state a brief plan:
-```
-1. [Step] → verify: [check]
-2. [Step] → verify: [check]
-3. [Step] → verify: [check]
+### Development
+```bash
+npm run dev           # Start both client (Vite) and server concurrently
+npm run dev:client   # Start only client at http://localhost:5173
+npm run dev:server   # Start only server at http://localhost:3001
+npm run build         # Build client for production
+npm start             # Start production server (requires npm run build first)
 ```
 
-Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+### Client
+```bash
+cd client
+npm run lint          # Run ESLint
+npm run dev           # Start Vite dev server
+npm run build         # Build for production
+```
+
+### Server
+```bash
+cd server
+npm run dev           # Start server with --watch for hot reload
+npm run start         # Start in production mode
+```
+
+### Useful for debugging
+```bash
+# Check API health
+curl http://localhost:3001/api/health
+
+# MongoDB connection string (in .env)
+MONGODB_URI=mongodb://localhost:27017/tiretrack
+```
 
 ---
 
-**These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
+## Architecture Overview
+
+### Monorepo Structure (npm workspaces)
+```
+tiretrack-app/
+├── client/                    # React 19 + Vite + React Router v7
+├── server/                    # Express + MongoDB with Mongoose
+└── package.json              # Root workspace config
+```
+
+### Frontend Stack
+- **React 19** with Hooks (no context/Redux state management beyond AuthContext)
+- **Vite 8** — build tool with HMR
+- **React Router v7** — client-side routing (not the custom screen state from old docs)
+- **Tailwind CSS v4** — utility-first styling
+- **Recharts** — charts (area, bar, pie)
+- **React Select** — searchable dropdowns
+- **SweetAlert2** — modal dialogs
+
+**Key locations:**
+- Pages: `client/src/pages/admin/` (Dashboard, ServiceLog, Inventory, etc.) and `client/src/pages/tech/` (QuickInput, RecentEntries)
+- Components: `client/src/components/` (layout, ReceiptDocument for printing)
+- Contexts: `client/src/contexts/AuthContext.jsx` (JWT session + role-based access)
+- Services: `client/src/services/api.js` (fetch wrapper with auth headers)
+- Utils: `client/src/utils/` (constants, formatters, receipt storage logic)
+
+### Backend Stack
+- **Express** on Node.js (ESM modules)
+- **MongoDB + Mongoose** — primary data store
+- **node-cron** — scheduled auto-backup
+- **AWS SDK v3** — S3-compatible backup (MinIO, AWS S3)
+- **CSV fallback** — legacy data import/export via `csv-parser` and `csv-writer`
+
+**Key locations:**
+- Models: `server/models/` (Service, Inventory, RecycleBin with Mongoose schemas)
+- Routes: `server/routes/` (auth, service, inventory, backup, recycle)
+- Services: `server/services/` (csv, backup, inventory, receipt helpers)
+- Middleware: `server/middleware/auth.middleware.js` (JWT verification)
+- Migration: `server/scripts/migrate-csv-to-mongo.js` (one-time CSV → MongoDB migration)
+
+### Data Flow
+1. **Login:** PIN sent to `/api/auth/login` → JWT token stored in localStorage
+2. **Service Records:** Tech enters via QuickInput → saved to MongoDB Service model → prints receipt
+3. **Inventory:** Admin manages tire stock → CRUD operations on Inventory model
+4. **Backup:** Manual or auto-backup exports MongoDB data → S3-compatible storage
+5. **Recycle Bin:** Deleted records soft-deleted in RecycleBin model (soft delete pattern)
 
 ---
 
-## 5. Project-Specific Rules (Zenith Case Opening Demo)
+## Development Guidelines
 
-### Navigation
-- Navigation is a `screen` state string in `App.jsx` — **no React Router**. Adding a screen = add a `screen === 'xxx'` case and pass an `onXxx` callback prop. Never install a routing library without CEO approval.
+### Frontend: Adding a New Admin Page
+1. Create page in `client/src/pages/admin/NewPage.jsx`
+2. Add route in `client/src/App.jsx` under the admin `<Route>` element
+3. Add menu item in `client/src/components/layout/Sidebar.jsx`
+4. Use `api.js` methods for API calls (ensures JWT in headers)
+5. Style with Tailwind; use `focus-visible:ring-*` for focus states (accessibility)
 
-### Public Name Display
-- All player names shown in public UI (Live Drops, Leaderboard) **must** be passed through `censorName()` from `client/src/lib/utils.js`. Never display raw names outside admin-only views.
+### Backend: Adding a New Route
+1. Create route handler in `server/routes/new.routes.js`
+2. Use `authMiddleware` to protect routes (auto-extracts user role)
+3. Add data validation before database operations
+4. Import and register route in `server/index.js`
+5. MongoDB queries use Mongoose models (Service, Inventory, RecycleBin)
 
-### API Endpoints
-- Ask CEO before adding any new public (`/api/game/*`) or admin (`/api/admin/*`) endpoints.
-- New game routes go in `server/src/routes/game.js` **before** `export default router`.
+### Authentication
+- Routes are protected via JWT in Authorization header
+- `authMiddleware` extracts user role (`admin` or `tech`) and attaches to `req.user`
+- Frontend maintains JWT in localStorage via `AuthContext`
+- Roles control UI visibility and API access (admin sees all, tech sees only quick input/recent entries)
 
-### UI Standards
-- All interactive elements must have visible `focus-visible:ring-*` states — never `outline-none` without a replacement.
-- Decorative Material Symbols icons must have `aria-hidden="true"`.
-- Use web-design-guidelines skill (`/web-design-guidelines`) when building or modifying screens.
+### Data Validation
+- Backend validates all incoming data before MongoDB operations
+- Frontend can show error toasts via `SweetAlert2` on failed API calls
+- Server returns 400 for validation errors, 401 for auth failures, 500 for server errors
 
-### Ask CEO Before
-- Changing DB schema (models in `server/src/models/`)
-- Adding npm dependencies
-- Modifying user flow order (Welcome → Game → Result → Summary)
-- Changing deployment config (Docker Compose, nginx, env vars)
-- Altering admin auth logic
+### CSV Export/Import (Legacy Support)
+- `csv.service.js` handles export/import logic
+- Used by ImportExport page for bulk migrations
+- Legacy CSV data can be migrated to MongoDB via `migrate-csv-to-mongo.js` script
+
+### Backup Service
+- Auto-backup runs on schedule (configured in .env via `BACKUP_SCHEDULE` cron pattern)
+- Exports MongoDB data as CSV → uploads to S3
+- Manual trigger available in admin Backup Settings page
+- S3 endpoint can be AWS S3 or MinIO (configured in .env)
+
+---
+
+## Environment Setup
+
+Create `.env` in the root (both client and server read from root `.env`):
+
+```env
+# Server
+PORT=3001
+NODE_ENV=development
+
+# MongoDB
+MONGODB_URI=mongodb://localhost:27017/tiretrack
+
+# Auth
+ADMIN_PIN=9999
+TECH_PIN=1234
+SESSION_SECRET=your-random-secret-here
+SESSION_EXPIRY_HOURS=24
+
+# S3 Backup (optional)
+S3_ENDPOINT=https://s3.example.com
+S3_BUCKET=tiretrack-app
+S3_ACCESS_KEY=your_access_key
+S3_SECRET_KEY=your_secret_key
+S3_REGION=us-east-1
+BACKUP_SCHEDULE=0 2 * * *  # 2 AM daily (cron format)
+
+# Vite (frontend)
+VITE_API_BASE_URL=http://localhost:3001
+```
+
+---
+
+## Code Patterns
+
+### Fetch with Auth (Frontend)
+```javascript
+// client/src/services/api.js provides a wrapper
+const response = await api.post('/services', { ... });
+// Automatically includes JWT from localStorage and error handling
+```
+
+### Protected Route (Frontend)
+Routes in `App.jsx` use `<ProtectedRoute allowedRole="admin">` to gate access by role.
+
+### Database Query (Backend)
+```javascript
+// Use Mongoose models (Service, Inventory, RecycleBin)
+const service = await Service.findById(id);
+await Service.deleteOne({ _id: id }); // Hard delete
+```
+
+### Soft Delete (Backend)
+New records go to RecycleBin model instead of permanent deletion, allowing undo within 30 minutes.
+
+---
+
+## Known Constraints
+
+- **No direct CSV storage:** App uses MongoDB. CSV is only for import/export and legacy migration.
+- **Receipt printing:** Sized for 80mm thermal paper via `@media print` CSS — test on actual printer.
+- **PIN auth, not password:** Users log in with a 4-digit PIN, reset via admin environment variable.
+- **CORS:** API is hardcoded to accept `http://localhost:5173` in dev. Update `server/index.js` for production.
+- **Timezone:** All dates stored in UTC; client formats for Thai locale via `formatters.js`.
+
+---
+
+## Before Submitting Changes
+
+1. Run `npm run lint` in client directory (ESLint)
+2. Test both admin and tech routes locally
+3. If adding a route, verify JWT middleware is applied
+4. If modifying Mongoose models, check migrations (no auto-migration)
+5. Receipt printing: test on actual 80mm printer if changed

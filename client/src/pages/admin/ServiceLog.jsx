@@ -155,60 +155,151 @@ export default function ServiceLog() {
                 records.map(record => {
                   const sType = SERVICE_TYPE_MAP[record.service_type];
                   const isExpanded = expanded === record.id;
+                  const costPerUnit = Number(record.cost_price) || 0;
+                  const qtyNum = Number(record.quantity) || 0;
+                  const totalPrice = Number(record.total_price) || 0;
+                  const profit = totalPrice - (costPerUnit * qtyNum);
+
                   return (
-                    <tr
-                      key={record.id}
-                      onClick={() => setExpanded(isExpanded ? null : record.id)}
-                      className="border-b border-border-light hover:bg-surface-dim/50 transition-colors cursor-pointer"
-                    >
-                      <td className="px-4 py-3 text-text-secondary whitespace-nowrap">{formatDate(record.date)}</td>
-                      <td className="px-4 py-3">
-                        <span className="font-semibold text-text-primary bg-surface-dim px-2 py-0.5 rounded">{record.license_plate || '-'}</span>
-                        {record.car_model && <span className="text-xs text-text-muted ml-2">{record.car_model}</span>}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium"
-                          style={{ backgroundColor: `${sType?.color || '#CBD5E1'}12`, color: sType?.color }}
-                        >
-                          <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>
-                            {sType?.icon}
+                    <>
+                      <tr
+                        key={record.id}
+                        onClick={() => setExpanded(isExpanded ? null : record.id)}
+                        className="border-b border-border-light hover:bg-surface-dim/50 transition-colors cursor-pointer"
+                      >
+                        <td className="px-4 py-3 text-text-secondary whitespace-nowrap">{formatDate(record.date)}</td>
+                        <td className="px-4 py-3">
+                          <span className="font-semibold text-text-primary bg-surface-dim px-2 py-0.5 rounded">{record.license_plate || '-'}</span>
+                          {record.car_model && <span className="text-xs text-text-muted ml-2">{record.car_model}</span>}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium"
+                            style={{ backgroundColor: `${sType?.color || '#CBD5E1'}12`, color: sType?.color }}
+                          >
+                            <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>
+                              {sType?.icon}
+                            </span>
+                            {sType?.label}
                           </span>
-                          {sType?.label}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-text-secondary">
-                        {record.service_type === 'tire_change' ? (
-                          <span>
-                            {TIRE_BRANDS.find(b => b.code === record.tire_brand)?.label || record.tire_brand}
-                            {record.tire_model ? ` ${record.tire_model}` : ''}
-                            {record.tire_size ? ` (${record.tire_size})` : ''}
-                            {record.quantity ? ` × ${record.quantity}` : ''}
-                          </span>
-                        ) : (
-                          <span>{record.notes || '-'}</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right font-semibold text-text-primary whitespace-nowrap">
-                        {formatCurrency(record.total_price)}
-                      </td>
-                      <td className="px-4 py-3 text-center whitespace-nowrap">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setEditingRecord({...record}); }}
-                          className="p-1.5 rounded-lg text-text-muted hover:text-primary hover:bg-primary-50 transition-colors mr-1"
-                          title="แก้ไข"
-                        >
-                          <span className="material-symbols-outlined text-lg">edit</span>
-                        </button>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleDelete(record.id); }}
-                          className="p-1.5 rounded-lg text-text-muted hover:text-danger hover:bg-danger-bg transition-colors"
-                          title="ลบ"
-                        >
-                          <span className="material-symbols-outlined text-lg">delete</span>
-                        </button>
-                      </td>
-                    </tr>
+                        </td>
+                        <td className="px-4 py-3 text-text-secondary">
+                          {record.service_type === 'tire_change' ? (
+                            <span>
+{record.tire_brand}
+{record.tire_model ? ` ${record.tire_model}` : ''}
+                              {record.tire_size ? ` (${record.tire_size})` : ''}
+                              {record.quantity ? ` × ${record.quantity}` : ''}
+                            </span>
+                          ) : (
+                            <span>{record.notes || '-'}</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-right font-semibold text-text-primary whitespace-nowrap">
+                          {formatCurrency(record.total_price)}
+                        </td>
+                        <td className="px-4 py-3 text-center whitespace-nowrap">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setEditingRecord({...record}); }}
+                            className="p-1.5 rounded-lg text-text-muted hover:text-primary hover:bg-primary-50 transition-colors mr-1"
+                            title="แก้ไข"
+                          >
+                            <span className="material-symbols-outlined text-lg">edit</span>
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleDelete(record.id); }}
+                            className="p-1.5 rounded-lg text-text-muted hover:text-danger hover:bg-danger-bg transition-colors"
+                            title="ลบ"
+                          >
+                            <span className="material-symbols-outlined text-lg">delete</span>
+                          </button>
+                        </td>
+                      </tr>
+                      {isExpanded && (
+                        <tr key={`${record.id}-expanded`} className="bg-surface-dim/40 border-b border-border-light">
+                          <td colSpan={6} className="px-6 py-4">
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 text-sm">
+                              {record.car_model && (
+                                <div>
+                                  <span className="text-xs text-text-muted block">รุ่นรถ</span>
+                                  <span className="font-medium">{record.car_model}</span>
+                                </div>
+                              )}
+                              {record.car_color && (
+                                <div>
+                                  <span className="text-xs text-text-muted block">สีรถ</span>
+                                  <span className="font-medium">{record.car_color}</span>
+                                </div>
+                              )}
+                              {record.province && (
+                                <div>
+                                  <span className="text-xs text-text-muted block">จังหวัด</span>
+                                  <span className="font-medium">{record.province}</span>
+                                </div>
+                              )}
+                              {record.service_type === 'tire_change' && (
+                                <>
+                                  <div>
+                                    <span className="text-xs text-text-muted block">ยี่ห้อ</span>
+                                    <span className="font-medium">{record.tire_brand}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-xs text-text-muted block">ขนาด</span>
+                                    <span className="font-medium">{record.tire_size || '-'}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-xs text-text-muted block">รุ่นยาง</span>
+                                    <span className="font-medium">{record.tire_model || '-'}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-xs text-text-muted block">จำนวน</span>
+                                    <span className="font-medium">{record.quantity || '-'} เส้น</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-xs text-text-muted block">ต้นทุน/เส้น</span>
+                                    <span className="font-medium text-text-secondary">{formatCurrency(record.cost_price)}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-xs text-text-muted block">ราคาขาย/เส้น</span>
+                                    <span className="font-medium">{formatCurrency(record.price_per_unit)}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-xs text-text-muted block">ต้นทุนรวม</span>
+                                    <span className="font-medium text-text-secondary">{formatCurrency(costPerUnit * qtyNum)}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-xs text-text-muted block">กำไร</span>
+                                    <span className={`font-semibold ${profit >= 0 ? 'text-green-600' : 'text-danger'}`}>
+                                      {formatCurrency(profit)}
+                                    </span>
+                                  </div>
+                                </>
+                              )}
+                              {record.technician && (
+                                <div>
+                                  <span className="text-xs text-text-muted block">ช่าง</span>
+                                  <span className="font-medium">{record.technician}</span>
+                                </div>
+                              )}
+                              {record.notes && (
+                                <div className="col-span-full">
+                                  <span className="text-xs text-text-muted block">หมายเหตุ</span>
+                                  <span className="text-text-secondary">{record.notes}</span>
+                                </div>
+                              )}
+                              {record.created_by && (
+                                <div>
+                                  <span className="text-xs text-text-muted block">บันทึกโดย</span>
+                                  <span className={`text-xs px-1.5 py-0.5 rounded ${record.created_by === 'admin' ? 'bg-primary-50 text-primary' : 'bg-surface text-text-secondary'}`}>
+                                    {record.created_by === 'admin' ? 'Admin' : 'Tech'}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </>
                   );
                 })
               )}
@@ -286,8 +377,40 @@ export default function ServiceLog() {
                       className="w-full px-3 py-2 rounded-xl border border-border bg-surface-dim outline-none"
                     >
                       <option value="">เลือก... </option>
-                      {TIRE_BRANDS.map(b => <option key={b.code} value={b.code}>{b.label}</option>)}
+                      {TIRE_BRANDS.map(b => <option key={b.code} value={b.code}>{b.code}</option>)}
                     </select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-semibold text-text-secondary mb-1 block">ขนาดยาง</label>
+                      <input
+                        type="text"
+                        value={editingRecord.tire_size}
+                        onChange={e => setEditingRecord({...editingRecord, tire_size: e.target.value})}
+                        placeholder="เช่น 195/65-15"
+                        className="w-full px-3 py-2 rounded-xl border border-border bg-surface-dim outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-text-secondary mb-1 block">รุ่นยาง</label>
+                      <input
+                        type="text"
+                        value={editingRecord.tire_model}
+                        onChange={e => setEditingRecord({...editingRecord, tire_model: e.target.value})}
+                        placeholder="เช่น ME3"
+                        className="w-full px-3 py-2 rounded-xl border border-border bg-surface-dim outline-none"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-text-secondary mb-1 block">ต้นทุน/เส้น (บาท)</label>
+                    <input
+                      type="number"
+                      value={editingRecord.cost_price}
+                      onChange={e => setEditingRecord({...editingRecord, cost_price: e.target.value})}
+                      placeholder="0"
+                      className="w-full px-3 py-2 rounded-xl border border-border bg-surface-dim outline-none"
+                    />
                   </div>
                 </>
               ) : (

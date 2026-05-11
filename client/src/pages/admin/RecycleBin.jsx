@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
 import { api } from '../../services/api.js';
-import { SERVICE_TYPE_MAP, TIRE_BRANDS } from '../../utils/constants.js';
+import { SERVICE_TYPE_MAP } from '../../utils/constants.js';
 import { formatDate } from '../../utils/formatters.js';
 
 const MySwal = withReactContent(Swal);
@@ -205,7 +205,7 @@ export default function RecycleBin() {
                     ) : (
                       <>
                         <td className="px-4 py-3 font-semibold text-text-primary">
-                          {TIRE_BRANDS.find(b => b.code === item.data.tire_brand)?.label || item.data.tire_brand}
+                          {item.data.tire_brand}
                         </td>
                         <td className="px-4 py-3 font-medium">{item.data.tire_size}</td>
                         <td className="px-4 py-3 text-text-secondary">{item.data.tire_model || '-'}</td>

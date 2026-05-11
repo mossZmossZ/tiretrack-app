@@ -98,6 +98,13 @@ export async function getCSVContent() {
   return lines.join('\n') + '\n';
 }
 
+function cleanNone(val) {
+  if (!val) return '';
+  const cleaned = val.trim();
+  if (cleaned === 'none' || cleaned === 'None' || cleaned === 'NONE') return '';
+  return cleaned;
+}
+
 // Import legacy inventory CSV (tire_brand, tire_size, tire_model, cost_price)
 export async function importLegacy(csvContent) {
   const lines = csvContent.split('\n').filter(l => l.trim());
@@ -117,10 +124,18 @@ export async function importLegacy(csvContent) {
     if (values.length < 2) { skipped++; continue; }
 
     try {
-      const tire_brand = values[0]?.trim() || '';
-      const tire_size = values[1]?.trim() || '';
-      const tire_model = values[2]?.trim() || '';
-      const cost_price = values[3] ? values[3].replace(/[,฿\s]/g, '').trim() : '0';
+      const tire_brand = cleanNone(values[0]?.trim() || '');
+      const tire_size = cleanNone(values[1]?.trim() || '');
+      const tire_model = cleanNone(values[2]?.trim() || '');
+
+      let cost_price = '0';
+      if (values[3]) {
+        const cleaned = cleanNone(values[3].replace(/[,฿\s]/g, '').trim());
+        if (cleaned && !isNaN(Number(cleaned))) {
+          cost_price = cleaned;
+        }
+      }
+
       await create({ tire_brand, tire_size, tire_model, cost_price });
       imported++;
     } catch (err) {

@@ -13,6 +13,7 @@ client/dist/
 
 # AI
 .claude/
+.agents
 # IDE
 .vscode/
 .idea/
@@ -27,3 +28,4 @@ Thumbs.db
 # Stitch fetch (design tool artifacts)
 stitch-fetch/
 
+assets/

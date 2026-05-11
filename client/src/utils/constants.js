@@ -13,12 +13,15 @@ export const TIRE_BRANDS = [
   { code: 'BS', label: 'Bridgestone' },
   { code: 'GY', label: 'Goodyear' },
   { code: 'ML', label: 'Maxxis' },
+  { code: 'MS', label: 'Maxxis' },
   { code: 'DL', label: 'Dunlop' },
   { code: 'YK', label: 'Yokohama' },
   { code: 'TY', label: 'Toyo' },
-  { code: 'MS', label: 'Maxxis Sport' },
   { code: 'HK', label: 'Hankook' },
   { code: 'KD', label: 'Kumho' },
+  { code: 'DS', label: 'Deestone' },
+  { code: 'SP', label: 'Sportrak' },
+  { code: 'FS', label: 'Firestone' },
   { code: 'OT', label: 'อื่นๆ' },
 ];
 

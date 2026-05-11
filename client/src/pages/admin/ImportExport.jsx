@@ -125,6 +125,9 @@ export default function ImportExport() {
               {result.details && (
                 <div className="text-xs text-text-secondary mt-2 space-y-0.5">
                   <p>นำเข้า: {result.details.imported} รายการ</p>
+                  {result.details.matched > 0 && (
+                    <p className="text-success">ตรงกับ Inventory: {result.details.matched} รายการ</p>
+                  )}
                   {result.details.skipped > 0 && <p>ข้าม: {result.details.skipped} รายการ</p>}
                   {result.details.errors?.length > 0 && (
                     <div className="mt-1">
