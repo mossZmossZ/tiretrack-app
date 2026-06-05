@@ -1,4 +1,15 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(node --check index.js)",
+      "Bash(node --check db/mongo.js)",
+      "Bash(node --check lib/csv.js)",
+      "Bash(node --check services/service.service.js)",
+      "Bash(node --check services/inventory.service.js)",
+      "Bash(docker compose *)"
+    ]
+  },
   "enabledPlugins": {
     "engineering-skills@claude-code-skills": true
   }

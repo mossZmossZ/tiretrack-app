@@ -3,12 +3,22 @@ import cron from 'node-cron';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { getDb } from '../db/mongo.js';
+import { serializeRecords, parseCSV } from '../lib/csv.js';
+import { SERVICE_HEADERS } from './service.service.js';
+import { INVENTORY_HEADERS } from './inventory.service.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.join(__dirname, '../data');
 const configPath = path.join(dataDir, 'backup-config.json');
 
-const FILES_TO_BACKUP = ['services.csv', 'inventory.csv'];
+// Maps each S3 object key to the collection it represents and the column order
+// to serialize/parse. Keeps S3 layout identical to the CSV-era so existing
+// backups remain restorable.
+const BACKUP_TARGETS = [
+  { filename: 'services.csv', collection: 'services', headers: SERVICE_HEADERS },
+  { filename: 'inventory.csv', collection: 'inventory', headers: INVENTORY_HEADERS },
+];
 
 let s3Client = null;
 let currentCronJob = null;
@@ -26,19 +36,22 @@ export const getConfig = () => {
 };
 
 const saveConfig = (config) => {
+  if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+  }
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 };
 
 export const updateConfig = (newSettings) => {
   const config = { ...getConfig(), ...newSettings };
   saveConfig(config);
-  
+
   if (config.autoEnabled) {
     startCronJob(config.schedule);
   } else {
     stopCronJob();
   }
-  
+
   return config;
 };
 
@@ -61,38 +74,52 @@ const initS3 = () => {
   return s3Client;
 };
 
+// Project a Mongo doc into the CSV-shaped object the headers expect:
+// _id is exposed as `id`; all other fields default to empty string.
+const docToCsvRow = (doc, headers) => {
+  const { _id, ...rest } = doc;
+  const row = { id: _id };
+  for (const h of headers) {
+    if (h === 'id') continue;
+    row[h] = rest[h] ?? '';
+  }
+  return row;
+};
+
+// Reverse: a CSV row uses `id`, but Mongo stores it as `_id`.
+const csvRowToDoc = (row) => {
+  const { id, ...rest } = row;
+  return { _id: id, ...rest };
+};
+
 export const backupNow = async () => {
   const client = initS3();
   const bucket = process.env.S3_BUCKET;
+  const db = getDb();
 
   const results = [];
-  
-  for (const filename of FILES_TO_BACKUP) {
-    const filePath = path.join(dataDir, filename);
-    if (!fs.existsSync(filePath)) {
-      results.push({ file: filename, status: 'skipped', reason: 'File not found locally' });
-      continue;
-    }
 
-    const fileContent = fs.readFileSync(filePath);
+  for (const { filename, collection, headers } of BACKUP_TARGETS) {
+    const docs = await db.collection(collection).find({}).toArray();
+    const rows = docs.map(d => docToCsvRow(d, headers));
+    const csv = serializeRecords(headers, rows);
 
     const command = new PutObjectCommand({
       Bucket: bucket,
       Key: filename,
-      Body: fileContent,
+      Body: csv,
       ContentType: 'text/csv'
     });
 
     try {
       await client.send(command);
-      results.push({ file: filename, status: 'success' });
+      results.push({ file: filename, status: 'success', records: docs.length });
     } catch (error) {
       console.error(`Backup failed for ${filename}:`, error);
       throw new Error(`Failed to upload ${filename} to S3: ${error.message}`);
     }
   }
 
-  // Update last backup time
   const config = getConfig();
   config.lastBackup = new Date().toISOString();
   config.lastStatus = 'success';
@@ -114,10 +141,11 @@ const streamToBuffer = async (stream) => {
 export const restoreBackup = async () => {
   const client = initS3();
   const bucket = process.env.S3_BUCKET;
+  const db = getDb();
 
   const results = [];
 
-  for (const filename of FILES_TO_BACKUP) {
+  for (const { filename, collection, headers } of BACKUP_TARGETS) {
     const command = new GetObjectCommand({
       Bucket: bucket,
       Key: filename,
@@ -126,11 +154,18 @@ export const restoreBackup = async () => {
     try {
       const response = await client.send(command);
       const buffer = await streamToBuffer(response.Body);
-      
-      const filePath = path.join(dataDir, filename);
-      fs.writeFileSync(filePath, buffer);
-      
-      results.push({ file: filename, status: 'success' });
+      const csv = buffer.toString('utf-8');
+      const rows = parseCSV(csv, headers);
+      const docs = rows.map(csvRowToDoc).filter(d => d._id);
+
+      // Destructive replace: matches the CSV-era behaviour where the S3 file
+      // overwrote the local file outright.
+      await db.collection(collection).deleteMany({});
+      if (docs.length > 0) {
+        await db.collection(collection).insertMany(docs);
+      }
+
+      results.push({ file: filename, status: 'success', records: docs.length });
     } catch (error) {
       console.error(`Restore failed for ${filename}:`, error);
       if (error.name === 'NoSuchKey') {
@@ -146,7 +181,7 @@ export const restoreBackup = async () => {
 
 const startCronJob = (schedule) => {
   stopCronJob();
-  
+
   if (!cron.validate(schedule)) {
     console.error(`Invalid cron schedule: ${schedule}. Fallback to daily.`);
     schedule = '0 2 * * *';
@@ -164,7 +199,7 @@ const startCronJob = (schedule) => {
       saveConfig(config);
     }
   });
-  
+
   console.log(`[Backup] Auto-backup scheduled with cron: ${schedule}`);
 };
 

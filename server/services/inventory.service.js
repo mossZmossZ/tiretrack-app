@@ -1,141 +1,71 @@
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { v4 as uuidv4 } from 'uuid';
+import { getDb } from '../db/mongo.js';
+import { parseCSVLine, serializeRecords } from '../lib/csv.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = path.resolve(__dirname, '../data');
-const CSV_PATH = path.join(DATA_DIR, 'inventory.csv');
+const COLLECTION = 'inventory';
 
 const HEADERS = ['id', 'tire_brand', 'tire_size', 'tire_model', 'cost_price', 'created_at'];
-const HEADER_LINE = HEADERS.join(',');
 
-function ensureFile() {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
-  if (!fs.existsSync(CSV_PATH)) {
-    fs.writeFileSync(CSV_PATH, HEADER_LINE + '\n', 'utf-8');
-  }
+function collection() {
+  return getDb().collection(COLLECTION);
 }
 
-function escapeCSV(val) {
-  if (val === null || val === undefined) return '';
-  const str = String(val);
-  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-    return '"' + str.replace(/"/g, '""') + '"';
+function toApi(doc) {
+  if (!doc) return null;
+  const { _id, ...rest } = doc;
+  const out = { id: _id };
+  for (const h of HEADERS) {
+    if (h === 'id') continue;
+    out[h] = rest[h] ?? '';
   }
-  return str;
+  return out;
 }
 
-function parseCSVLine(line) {
-  const values = [];
-  let current = '';
-  let inQuotes = false;
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (inQuotes) {
-      if (ch === '"' && line[i + 1] === '"') {
-        current += '"';
-        i++;
-      } else if (ch === '"') {
-        inQuotes = false;
-      } else {
-        current += ch;
-      }
-    } else {
-      if (ch === '"') {
-        inQuotes = true;
-      } else if (ch === ',') {
-        values.push(current);
-        current = '';
-      } else {
-        current += ch;
-      }
-    }
-  }
-  values.push(current);
-  return values;
+export async function readAll() {
+  const docs = await collection().find({}).toArray();
+  return docs.map(toApi);
 }
 
-export function readAll() {
-  ensureFile();
-  const content = fs.readFileSync(CSV_PATH, 'utf-8');
-  const lines = content.split('\n').map(l => l.trim()).filter(Boolean);
-  if (lines.length <= 1) return [];
-
-  const records = [];
-  for (let i = 1; i < lines.length; i++) {
-    const vals = parseCSVLine(lines[i]);
-    const obj = {};
-    HEADERS.forEach((h, idx) => {
-      obj[h] = vals[idx] || '';
-    });
-    records.push(obj);
-  }
-  return records;
+export async function findById(id) {
+  const doc = await collection().findOne({ _id: id });
+  return toApi(doc);
 }
 
-export function create(data) {
-  ensureFile();
+export async function create(data) {
   const id = uuidv4();
-  const now = new Date().toISOString();
-  
   const record = {
-    id,
+    _id: id,
     tire_brand: data.tire_brand || '',
     tire_size: data.tire_size || '',
     tire_model: data.tire_model || '',
     cost_price: data.cost_price || '0',
-    created_at: now
+    created_at: new Date().toISOString()
   };
-
-  const line = HEADERS.map(h => escapeCSV(record[h])).join(',');
-  fs.appendFileSync(CSV_PATH, line + '\n', 'utf-8');
-  return record;
+  await collection().insertOne(record);
+  return toApi(record);
 }
 
-export function findById(id) {
-  const all = readAll();
-  return all.find(r => r.id === id) || null;
+export async function updateById(id, updates) {
+  const current = await collection().findOne({ _id: id });
+  if (!current) return null;
+
+  const merged = { ...current, ...updates };
+  delete merged._id;
+  await collection().updateOne({ _id: id }, { $set: merged });
+  return toApi({ _id: id, ...merged });
 }
 
-export function updateById(id, updates) {
-  ensureFile();
-  const all = readAll();
-  const idx = all.findIndex(r => r.id === id);
-  if (idx === -1) return null;
-
-  all[idx] = { ...all[idx], ...updates };
-
-  const lines = [HEADER_LINE];
-  all.forEach(record => {
-    lines.push(HEADERS.map(h => escapeCSV(record[h])).join(','));
-  });
-  fs.writeFileSync(CSV_PATH, lines.join('\n') + '\n', 'utf-8');
-  return all[idx];
+export async function deleteById(id) {
+  const res = await collection().deleteOne({ _id: id });
+  return res.deletedCount === 1;
 }
 
-export function deleteById(id) {
-  ensureFile();
-  const all = readAll();
-  const authRecords = all.filter(r => r.id !== id);
-  if (all.length === authRecords.length) return false;
-
-  const lines = [HEADER_LINE];
-  authRecords.forEach(record => {
-    lines.push(HEADERS.map(h => escapeCSV(record[h])).join(','));
-  });
-  fs.writeFileSync(CSV_PATH, lines.join('\n') + '\n', 'utf-8');
-  return true;
+export async function getCSVContent() {
+  const all = await readAll();
+  return serializeRecords(HEADERS, all);
 }
 
-export function getCSVContent() {
-  ensureFile();
-  return fs.readFileSync(CSV_PATH, 'utf-8');
-}
-
-export function importLegacy(csvContent) {
+export async function importLegacy(csvContent) {
   const lines = csvContent.split('\n').filter(l => l.trim());
   let imported = 0;
   let skipped = 0;
@@ -144,14 +74,13 @@ export function importLegacy(csvContent) {
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     if (!line) continue;
-    
+
     if (line.includes('ยี่ห้อ') || line.includes('tire_brand')) {
-      // skip header
       continue;
     }
 
-    const values = line.includes('\t') 
-      ? line.split('\t').map(v => v.trim()) 
+    const values = line.includes('\t')
+      ? line.split('\t').map(v => v.trim())
       : parseCSVLine(line);
 
     if (values.length < 2) {
@@ -168,7 +97,7 @@ export function importLegacy(csvContent) {
         cost_price = values[3].replace(/[,฿\s]/g, '').trim();
       }
 
-      create({ tire_brand, tire_size, tire_model, cost_price });
+      await create({ tire_brand, tire_size, tire_model, cost_price });
       imported++;
     } catch (err) {
       skipped++;
@@ -178,3 +107,5 @@ export function importLegacy(csvContent) {
 
   return { imported, skipped, errors };
 }
+
+export const INVENTORY_HEADERS = HEADERS;

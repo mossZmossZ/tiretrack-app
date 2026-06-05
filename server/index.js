@@ -8,6 +8,7 @@ import serviceRoutes from './routes/service.routes.js';
 import inventoryRoutes from './routes/inventory.routes.js';
 import backupRoutes from './routes/backup.routes.js';
 import { initAutoBackup } from './services/backup.service.js';
+import { connectMongo, closeMongo } from './db/mongo.js';
 
 dotenv.config({ path: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../.env') });
 
@@ -25,14 +26,36 @@ app.use('/api/services', serviceRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/backup', backupRoutes);
 
-// Initialize auto-backup if enabled
-initAutoBackup();
-
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ success: true, message: 'TireTrack API is running', time: new Date().toISOString() });
 });
 
-app.listen(PORT, () => {
-  console.log(`🚗 TireTrack API running on http://localhost:${PORT}`);
-});
+async function start() {
+  try {
+    await connectMongo();
+    console.log('🍃 Mongo connected');
+  } catch (err) {
+    console.error('❌ Failed to connect to MongoDB:', err.message);
+    process.exit(1);
+  }
+
+  initAutoBackup();
+
+  const server = app.listen(PORT, () => {
+    console.log(`🚗 TireTrack API running on http://localhost:${PORT}`);
+  });
+
+  const shutdown = async (signal) => {
+    console.log(`\n${signal} received, shutting down...`);
+    server.close(async () => {
+      await closeMongo();
+      process.exit(0);
+    });
+  };
+
+  process.on('SIGINT', () => shutdown('SIGINT'));
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+}
+
+start();
