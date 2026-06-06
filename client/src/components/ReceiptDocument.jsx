@@ -1,9 +1,10 @@
 import { TIRE_BRANDS, SERVICE_TYPE_MAP } from '../utils/constants.js';
 import { formatCurrency, formatDate } from '../utils/formatters.js';
 
-export function ReceiptDocument({ config, data, receiptNumber }) {
+export function ReceiptDocument({ config, data, receiptNumber, type = 'tax_invoice' }) {
+  const isCashBill = type === 'cash_bill';
   const total = Number(data.total_price || 0);
-  const vatAmount = config.vat_registered ? Math.round(total * 7 / 107) : 0;
+  const vatAmount = (!isCashBill && config.vat_registered) ? Math.round(total * 7 / 107) : 0;
   const subtotal = total - vatAmount;
 
   const brandLabel = TIRE_BRANDS.find(b => b.code === data.tire_brand)?.label || data.tire_brand || '';
@@ -30,18 +31,34 @@ export function ReceiptDocument({ config, data, receiptNumber }) {
     >
       {/* Shop Header */}
       <div style={{ textAlign: 'center', marginBottom: '2px' }}>
-        <div style={{ fontSize: '15px', fontWeight: '900', letterSpacing: '0.5px', fontFamily: 'sans-serif' }}>
-          {config.shop_name || 'ชื่อร้าน'}
-        </div>
-        {config.address && (
-          <div style={{ fontSize: '10px', marginTop: '1px', lineHeight: '1.4' }}>{config.address}</div>
+        {!isCashBill && (
+          <>
+            <div style={{ fontSize: '15px', fontWeight: '900', letterSpacing: '0.5px', fontFamily: 'sans-serif' }}>
+              {config.shop_name || 'ชื่อร้าน'}
+            </div>
+            {config.address && (
+              <div style={{ fontSize: '10px', marginTop: '1px', lineHeight: '1.4' }}>{config.address}</div>
+            )}
+            {config.tax_id ? (
+              <div style={{ fontSize: '10px' }}>
+                เลขประจำตัวผู้เสียภาษี: <b>{config.tax_id}</b>
+              </div>
+            ) : (
+              <div style={{ fontSize: '10px', color: '#888' }}>(ยังไม่ได้กำหนดเลขผู้เสียภาษี)</div>
+            )}
+          </>
         )}
-        {config.tax_id ? (
-          <div style={{ fontSize: '10px' }}>
-            เลขประจำตัวผู้เสียภาษี: <b>{config.tax_id}</b>
-          </div>
-        ) : (
-          <div style={{ fontSize: '10px', color: '#888' }}>(ยังไม่ได้กำหนดเลขผู้เสียภาษี)</div>
+        {isCashBill && (
+          <>
+            {config.shop_name && (
+              <div style={{ fontSize: '15px', fontWeight: '900', letterSpacing: '0.5px', fontFamily: 'sans-serif' }}>
+                {config.shop_name}
+              </div>
+            )}
+            {config.address && (
+              <div style={{ fontSize: '10px', marginTop: '1px', lineHeight: '1.4' }}>{config.address}</div>
+            )}
+          </>
         )}
       </div>
 
@@ -50,11 +67,11 @@ export function ReceiptDocument({ config, data, receiptNumber }) {
       {/* Invoice Type */}
       <div style={{ textAlign: 'center' }}>
         <div style={{ fontWeight: 'bold', fontSize: '13px', letterSpacing: '0.5px' }}>
-          ใบกำกับภาษีอย่างย่อ
+          {isCashBill ? 'บิลเงินสด' : 'ใบกำกับภาษีอย่างย่อ'}
         </div>
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', marginTop: '2px' }}>
-        <span>เลขที่: {receiptNumber || 'DRAFT'}</span>
+      <div style={{ display: 'flex', justifyContent: isCashBill ? 'center' : 'space-between', fontSize: '10px', marginTop: '2px' }}>
+        {!isCashBill && <span>เลขที่: {receiptNumber || 'DRAFT'}</span>}
         <span>วันที่: {formatDate(data.date)}</span>
       </div>
 
@@ -100,7 +117,7 @@ export function ReceiptDocument({ config, data, receiptNumber }) {
       <div style={lineStyle} />
 
       {/* Totals */}
-      {config.vat_registered && (
+      {!isCashBill && config.vat_registered && (
         <>
           <div style={{ ...rowStyle, fontSize: '10px' }}>
             <span>ราคาก่อนภาษี</span>
@@ -117,7 +134,7 @@ export function ReceiptDocument({ config, data, receiptNumber }) {
         <span>รวมทั้งสิ้น</span>
         <span>{formatCurrency(total)}</span>
       </div>
-      {config.vat_registered && (
+      {!isCashBill && config.vat_registered && (
         <div style={{ textAlign: 'right', fontSize: '10px', color: '#555' }}>
           (รวมภาษีมูลค่าเพิ่มแล้ว)
         </div>
@@ -146,9 +163,11 @@ export function ReceiptDocument({ config, data, receiptNumber }) {
       <div style={{ textAlign: 'center', fontSize: '11px', fontWeight: '600' }}>
         ขอบคุณที่ใช้บริการ
       </div>
-      <div style={{ textAlign: 'center', fontSize: '9px', color: '#666', marginTop: '2px' }}>
-        {config.shop_name || 'ชื่อร้าน'}
-      </div>
+      {config.shop_name && (
+        <div style={{ textAlign: 'center', fontSize: '9px', color: '#666', marginTop: '2px' }}>
+          {config.shop_name}
+        </div>
+      )}
     </div>
   );
 }

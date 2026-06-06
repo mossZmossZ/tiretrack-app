@@ -95,6 +95,11 @@ export default function RecentEntries() {
                         {record.tire_brand} {record.tire_model} {record.tire_size} × {record.quantity}
                       </p>
                     )}
+                    {record.service_type === 'part_change' && Array.isArray(record.parts) && record.parts.length > 0 && (
+                      <p className="text-xs text-text-muted mt-1">
+                        {record.parts.map(p => `${p.name} ×${p.qty}`).join(', ')}
+                      </p>
+                    )}
                     <div className="flex items-center justify-between mt-2">
                       <span className="font-bold text-primary text-sm">{formatCurrency(record.total_price)}</span>
                       {canUndo && (

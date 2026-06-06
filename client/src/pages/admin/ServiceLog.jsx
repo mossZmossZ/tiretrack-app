@@ -185,6 +185,8 @@ export default function ServiceLog() {
                             {record.tire_size ? ` (${record.tire_size})` : ''}
                             {record.quantity ? ` × ${record.quantity}` : ''}
                           </span>
+                        ) : record.service_type === 'part_change' && Array.isArray(record.parts) && record.parts.length > 0 ? (
+                          <span>{record.parts.map(p => `${p.name} ×${p.qty}`).join(', ')}</span>
                         ) : (
                           <span>{record.notes || '-'}</span>
                         )}

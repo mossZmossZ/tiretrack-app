@@ -4,6 +4,7 @@ export const SERVICE_TYPES = [
   { value: 'wheel_alignment', label: 'ตั้งศูนย์ล้อ', icon: 'straighten', color: '#8B5CF6' },
   { value: 'tire_switch', label: 'สลับยาง', icon: 'swap_horiz', color: '#10B981' },
   { value: 'tire_pressure', label: 'เช็คลมยาง', icon: 'speed', color: '#F59E0B' },
+  { value: 'part_change', label: 'เปลี่ยนอะไหล่', icon: 'build', color: '#EC4899' },
 ];
 
 export const SERVICE_TYPE_MAP = Object.fromEntries(SERVICE_TYPES.map(s => [s.value, s]));

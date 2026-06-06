@@ -26,6 +26,7 @@ It replaces manual logbooks and Google Sheets with a streamlined digital service
 | Wheel Alignment   | ตั้งศูนย์ล้อ     | Minimal (date, plate, price, notes) |
 | Tire Switch       | สลับยาง          | Minimal (date, plate, price, notes) |
 | Tire Pressure     | เช็คลมยาง        | Minimal (date, plate, price, notes) |
+| Part Change       | เปลี่ยนอะไหล่   | Line-items (multiple parts per service, each with name, qty, price_per_unit) |
 
 ### Users
 
@@ -107,6 +108,8 @@ tiretrack-app/
 │   │   │   └── tech/           # Technician pages
 │   │   │       ├── QuickInput.jsx
 │   │   │       └── RecentEntries.jsx
+│   │   │   ├── admin/
+│   │   │   │   ├── PartsInventory.jsx  # คลังอะไหล่ CRUD page
 │   │   ├── contexts/
 │   │   │   └── AuthContext.jsx  # PIN auth state
 │   │   ├── services/
@@ -127,14 +130,16 @@ tiretrack-app/
 │
 ├── server/                      # Node.js + Express backend
 │   ├── routes/
-│   │   ├── auth.routes.js       # POST /api/auth/login
-│   │   ├── service.routes.js    # CRUD /api/services
-│   │   ├── inventory.routes.js  # CRUD /api/inventory
-│   │   └── backup.routes.js     # Backup/restore endpoints
+│   │   ├── auth.routes.js              # POST /api/auth/login
+│   │   ├── service.routes.js           # CRUD /api/services
+│   │   ├── inventory.routes.js         # CRUD /api/inventory
+│   │   ├── parts-inventory.routes.js   # CRUD /api/parts-inventory
+│   │   └── backup.routes.js            # Backup/restore endpoints
 │   ├── services/
-│   │   ├── service.service.js   # MongoDB ops for `services` collection
-│   │   ├── inventory.service.js # MongoDB ops for `inventory` collection
-│   │   └── backup.service.js    # Mongo → CSV → S3 backup & restore
+│   │   ├── service.service.js          # MongoDB ops for `services` collection
+│   │   ├── inventory.service.js        # MongoDB ops for `inventory` collection
+│   │   ├── parts-inventory.service.js  # MongoDB ops for `parts_inventory` collection
+│   │   └── backup.service.js           # Mongo → CSV → S3 backup & restore
 │   ├── db/
 │   │   └── mongo.js             # Connection lifecycle (connect/getDb/close)
 │   ├── lib/
@@ -214,12 +219,16 @@ tiretrack-app/
 | GET    | `/api/services/stats`     | Admin    | Dashboard statistics           |
 | POST   | `/api/services/import`    | Admin    | Import legacy CSV              |
 | GET    | `/api/services/export`    | Admin    | Export all data as CSV         |
-| GET    | `/api/inventory`          | Any      | List all inventory (used by Tech input) |
-| POST   | `/api/inventory`          | Admin    | Create new tire model/cost price |
-| PUT    | `/api/inventory/:id`      | Admin    | Edit tire model or price       |
-| DELETE | `/api/inventory/:id`      | Admin    | Delete tire model              |
-| POST   | `/api/inventory/import`   | Admin    | Bulk Import tire inventory     |
-| GET    | `/api/inventory/export`   | Admin    | Export tire inventory          |
+| GET    | `/api/inventory`               | Any      | List all tire inventory (used by Tech input) |
+| POST   | `/api/inventory`               | Admin    | Create new tire model/cost price |
+| PUT    | `/api/inventory/:id`           | Admin    | Edit tire model or price       |
+| DELETE | `/api/inventory/:id`           | Admin    | Delete tire model              |
+| POST   | `/api/inventory/import`        | Admin    | Bulk Import tire inventory     |
+| GET    | `/api/inventory/export`        | Admin    | Export tire inventory          |
+| GET    | `/api/parts-inventory`         | Any      | List all spare parts (used by Tech input) |
+| POST   | `/api/parts-inventory`         | Admin    | Create new spare part          |
+| PUT    | `/api/parts-inventory/:id`     | Admin    | Edit spare part                |
+| DELETE | `/api/parts-inventory/:id`     | Admin    | Delete spare part              |
 
 ---
 
@@ -263,10 +272,27 @@ tiretrack-app/
 
 ### Collections
 
-| Collection  | Purpose                              | `_id` shape          |
-| ----------- | ------------------------------------ | -------------------- |
-| `services`  | Service records (tire change, etc.)  | 8-char UUID slice    |
-| `inventory` | Tire SKUs with brand/size/cost       | Full UUID            |
+| Collection        | Purpose                                        | `_id` shape       |
+| ----------------- | ---------------------------------------------- | ----------------- |
+| `services`        | Service records (all types incl. part_change)  | 8-char UUID slice |
+| `inventory`       | Tire SKUs with brand/size/cost                 | Full UUID         |
+| `parts_inventory` | Spare part catalogue (name, category, cost)    | Full UUID         |
+
+#### `part_change` service records
+
+When `service_type === 'part_change'`, the service document carries a `parts` array instead of tire fields:
+
+```json
+{
+  "service_type": "part_change",
+  "parts": [
+    { "part_id": "uuid", "name": "น้ำมันเครื่อง Shell Helix", "category": "น้ำมันเครื่อง", "qty": 2, "price_per_unit": "240", "cost_price": "200" }
+  ],
+  "total_price": "480"
+}
+```
+
+`total_price` is auto-calculated server-side as `sum(price_per_unit × qty)` if not provided. Name and price are **snapshotted** onto each line item at save time so historical records are unaffected by future catalogue edits.
 
 No secondary indexes are created — the dataset is small enough that the auto `_id` index covers the only by-key lookup pattern. Add indexes here if the dataset grows.
 
@@ -369,7 +395,52 @@ The default `docker-compose.yml` is tuned for local development. Before deployin
 
 ---
 
-## 9. Phase Roadmap
+## 9. Receipt / Bill System
+
+Two receipt types are supported. Both are client-side only (no server involvement) — config is stored in `localStorage` and documents are printed via `window.print()`.
+
+### ใบกำกับภาษีอย่างย่อ (Tax Invoice)
+
+| Item | Detail |
+| ---- | ------ |
+| Settings route | `/admin/receipt` |
+| Sidebar label | ตั้งค่าใบกำกับภาษี |
+| localStorage key | `tiretrack_receipt_config` |
+| Config fields | `shop_name` (required), `tax_id` (required, 13 digits), `address` (optional), `vat_registered` (bool) |
+| Document heading | ใบกำกับภาษีอย่างย่อ |
+| VAT breakdown | Shown when `vat_registered = true` |
+
+### บิลเงินสด (Cash Bill)
+
+| Item | Detail |
+| ---- | ------ |
+| Settings route | `/admin/cashbill` |
+| Sidebar label | ตั้งค่าบิลเงินสด |
+| localStorage key | `tiretrack_cashbill_config` |
+| Config fields | `address` (optional only) |
+| Document heading | บิลเงินสด |
+| VAT breakdown | Never shown |
+
+### Print flow (QuickInput / Tech view)
+
+After saving a service, two buttons appear side by side:
+- **พิมพ์ใบกำกับภาษี** — opens `ReceiptModal` using `tiretrack_receipt_config`
+- **พิมพ์บิลเงินสด** — opens `CashBillModal` using `tiretrack_cashbill_config`
+
+Both modals render `ReceiptDocument` with the appropriate `type` prop (`'tax_invoice'` or `'cash_bill'`).
+
+### Key files
+
+| File | Role |
+| ---- | ---- |
+| `client/src/components/ReceiptDocument.jsx` | Shared document renderer; `type` prop controls header/heading/VAT |
+| `client/src/utils/receiptStorage.js` | localStorage read/write for both configs |
+| `client/src/pages/admin/ReceiptSettings.jsx` | ใบกำกับภาษี settings page |
+| `client/src/pages/admin/CashBillSettings.jsx` | บิลเงินสด settings page |
+
+---
+
+## 10. Phase Roadmap
 
 | Phase | Scope | Status |
 | ----- | ----- | ------ |
@@ -379,6 +450,8 @@ The default `docker-compose.yml` is tuned for local development. Before deployin
 | Phase 4 | Tire Inventory System, Dynamic Cost & Net Profit tracking, Inventory Import/Export | ✅ Done |
 | Phase 5 | S3 Backup & Restore, Auto-backup scheduling with MinIO | ✅ Done |
 | Phase 6 | MongoDB migration (CSV → Mongo), docker-compose for local Mongo | ✅ Done |
+| Phase 6.1 | Dual receipt types: ใบกำกับภาษีอย่างย่อ and บิลเงินสด | ✅ Done |
+| Phase 6.2 | เปลี่ยนอะไหล่ service type with คลังอะไหล่ (spare parts inventory, line-items per service) | ✅ Done |
 | Phase 7 | Google Sheets integration, Advanced analytics | 📋 Planned |
 | Phase 8 | Docker/K8s deployment, Performance optimization | 📋 Planned |
 

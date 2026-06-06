@@ -7,6 +7,8 @@ import authRoutes from './routes/auth.routes.js';
 import serviceRoutes from './routes/service.routes.js';
 import inventoryRoutes from './routes/inventory.routes.js';
 import backupRoutes from './routes/backup.routes.js';
+import settingsRoutes from './routes/settings.routes.js';
+import partsInventoryRoutes from './routes/parts-inventory.routes.js';
 import { initAutoBackup } from './services/backup.service.js';
 import { connectMongo, closeMongo } from './db/mongo.js';
 
@@ -25,6 +27,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/backup', backupRoutes);
+app.use('/api/settings', settingsRoutes);
+app.use('/api/parts-inventory', partsInventoryRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

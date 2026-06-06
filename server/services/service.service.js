@@ -23,6 +23,7 @@ function toApi(doc) {
     if (h === 'id') continue;
     out[h] = rest[h] ?? '';
   }
+  out.parts = rest.parts || [];
   return out;
 }
 
@@ -65,12 +66,16 @@ export async function create(data, createdBy = 'tech') {
     technician: data.technician || '',
     notes: data.notes || '',
     cost_price: data.cost_price || '0',
+    parts: data.parts || [],
     created_at: new Date().toISOString(),
     created_by: createdBy
   };
 
   if (record.service_type === 'tire_change' && record.quantity && record.price_per_unit && !data.total_price) {
     record.total_price = String(Number(record.quantity) * Number(record.price_per_unit));
+  }
+  if (record.service_type === 'part_change' && record.parts.length > 0 && !data.total_price) {
+    record.total_price = String(record.parts.reduce((s, p) => s + Number(p.price_per_unit || 0) * Number(p.qty || 1), 0));
   }
 
   await collection().insertOne(record);

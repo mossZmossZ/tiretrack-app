@@ -16,7 +16,8 @@ const NAV_GROUPS = [
   {
     label: 'Inventory',
     items: [
-      { to: '/admin/inventory', icon: 'inventory_2', label: 'ฐานข้อมูลยาง' },
+      { to: '/admin/inventory', icon: 'tire_repair', label: 'ฐานข้อมูลยาง' },
+      { to: '/admin/parts-inventory', icon: 'build', label: 'คลังอะไหล่' },
     ],
   },
   {
@@ -24,7 +25,8 @@ const NAV_GROUPS = [
     items: [
       { to: '/admin/import', icon: 'upload_file', label: 'นำเข้า/ส่งออก' },
       { to: '/admin/backup', icon: 'cloud_sync', label: 'สำรองข้อมูล' },
-      { to: '/admin/receipt', icon: 'receipt_long', label: 'ใบเสร็จ' },
+      { to: '/admin/receipt', icon: 'receipt_long', label: 'ตั้งค่าใบกำกับภาษี' },
+      { to: '/admin/cashbill', icon: 'receipt', label: 'ตั้งค่าบิลเงินสด' },
     ],
   },
 ];
