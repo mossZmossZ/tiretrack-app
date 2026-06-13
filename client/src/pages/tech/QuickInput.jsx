@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Select from 'react-select';
-import { SERVICE_TYPES, TIRE_BRANDS, TIRE_SIZES, CAR_COLORS, PROVINCES, QUANTITY_OPTIONS } from '../../utils/constants.js';
-import { formatCurrency, getToday } from '../../utils/formatters.js';
+import { SERVICE_TYPES, TIRE_BRANDS, CAR_COLORS, PROVINCES, QUANTITY_OPTIONS } from '../../utils/constants.js';
+import { formatCurrency, formatTireSize, getToday } from '../../utils/formatters.js';
 import { api } from '../../services/api.js';
 import { ReceiptDocument } from '../../components/ReceiptDocument.jsx';
 import { getReceiptConfig, getCashBillConfig, DEFAULT_CONFIG, DEFAULT_CASH_BILL_CONFIG } from '../../utils/receiptStorage.js';
@@ -19,7 +19,9 @@ export default function QuickInput() {
     quantity: '4',
     tire_brand: '',
     tire_model: '',
-    tire_size: '',
+    tire_width: '',
+    tire_aspect: '',
+    tire_rim: '',
     price_per_unit: '',
     total_price: '',
     technician: '',
@@ -104,7 +106,7 @@ export default function QuickInput() {
   };
 
   const goToConfirm = () => {
-    if (isTireChange && (!form.tire_brand || !form.tire_size || !form.price_per_unit)) return;
+    if (isTireChange && (!form.tire_brand || !form.tire_width || !form.tire_rim || !form.price_per_unit)) return;
     if (isPartChange) {
       const total = parts.reduce((s, p) => s + Number(p.price_per_unit || 0) * Number(p.qty || 1), 0);
       updateForm('total_price', String(total));
@@ -120,14 +122,16 @@ export default function QuickInput() {
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
-      const payload = isPartChange ? { ...form, parts } : form;
+      const tireSize = formatTireSize(form.tire_width, form.tire_aspect, form.tire_rim);
+      const basePayload = { ...form, tire_size: tireSize };
+      const payload = isPartChange ? { ...basePayload, parts } : basePayload;
       const res = await api.post('/services', payload);
       if (res.success) {
         setToast({ id: res.data.id, message: 'บันทึกสำเร็จ!' });
         setForm({
           service_type: '', license_plate: '', province: '', car_model: '', car_color: '',
-          quantity: '4', tire_brand: '', tire_model: '', tire_size: '', cost_price: '',
-          price_per_unit: '', total_price: '', technician: '', notes: '', date: getToday(),
+          quantity: '4', tire_brand: '', tire_model: '', tire_width: '', tire_aspect: '', tire_rim: '',
+          cost_price: '', price_per_unit: '', total_price: '', technician: '', notes: '', date: getToday(),
         });
         setParts([]);
         setStep(1);
@@ -154,7 +158,8 @@ export default function QuickInput() {
 
   const inventoryOptions = inventory.map(item => {
     const brandLabel = TIRE_BRANDS.find(b => b.code === item.tire_brand)?.label || item.tire_brand;
-    const desc = [brandLabel, item.tire_size, item.tire_model].filter(Boolean).join(' | ');
+    const sizeLabel = formatTireSize(item.tire_width, item.tire_aspect, item.tire_rim);
+    const desc = [brandLabel, sizeLabel, item.tire_model].filter(Boolean).join(' | ');
     return {
       value: item.id,
       label: `${desc} (ต้นทุน: ${formatCurrency(item.cost_price)})`,
@@ -164,14 +169,16 @@ export default function QuickInput() {
 
   const handleInventorySelect = (opt) => {
     if (!opt) {
-      setForm(f => ({ ...f, tire_brand: '', tire_size: '', tire_model: '', cost_price: '' }));
+      setForm(f => ({ ...f, tire_brand: '', tire_width: '', tire_aspect: '', tire_rim: '', tire_model: '', cost_price: '' }));
       return;
     }
     const { item } = opt;
     setForm(f => ({
       ...f,
       tire_brand: item.tire_brand,
-      tire_size: item.tire_size,
+      tire_width: item.tire_width,
+      tire_aspect: item.tire_aspect,
+      tire_rim: item.tire_rim,
       tire_model: item.tire_model,
       cost_price: item.cost_price
     }));
@@ -205,7 +212,7 @@ export default function QuickInput() {
               onClick={() => {
                 setForm({
                   service_type: '', license_plate: '', province: '', car_model: '', car_color: '',
-                  quantity: '4', tire_brand: '', tire_model: '', tire_size: '',
+                  quantity: '4', tire_brand: '', tire_model: '', tire_width: '', tire_aspect: '', tire_rim: '',
                   price_per_unit: '', total_price: '', technician: '', notes: '', date: getToday(),
                 });
                 setParts([]);
@@ -392,8 +399,14 @@ export default function QuickInput() {
                     isClearable
                     noOptionsMessage={() => "ไม่พบข้อมูลยาง"}
                     value={
-                      form.tire_brand && form.tire_size 
-                        ? inventoryOptions.find(o => o.item.tire_brand === form.tire_brand && o.item.tire_size === form.tire_size && o.item.tire_model === form.tire_model) || null
+                      form.tire_brand && form.tire_width
+                        ? inventoryOptions.find(o =>
+                            o.item.tire_brand === form.tire_brand &&
+                            o.item.tire_width === form.tire_width &&
+                            o.item.tire_aspect === form.tire_aspect &&
+                            o.item.tire_rim === form.tire_rim &&
+                            o.item.tire_model === form.tire_model
+                          ) || null
                         : null
                     }
                     styles={{
@@ -416,7 +429,7 @@ export default function QuickInput() {
                   {form.tire_brand && (
                     <div className="mt-3 bg-surface-dim p-3 rounded-xl border border-border-light flex flex-wrap gap-x-4 gap-y-2 text-sm text-text-secondary">
                       <span><b className="text-text-primary">ยี่ห้อ:</b> {TIRE_BRANDS.find(b => b.code === form.tire_brand)?.label || form.tire_brand}</span>
-                      <span><b className="text-text-primary">ขนาด:</b> {form.tire_size}</span>
+                      <span><b className="text-text-primary">ขนาด:</b> {formatTireSize(form.tire_width, form.tire_aspect, form.tire_rim)}</span>
                       <span><b className="text-text-primary">รุ่น:</b> {form.tire_model || '-'}</span>
                     </div>
                   )}
@@ -484,7 +497,7 @@ export default function QuickInput() {
             <button
               onClick={goToConfirm}
               disabled={
-                (isTireChange && (!form.tire_brand || !form.tire_size || !form.price_per_unit)) ||
+                (isTireChange && (!form.tire_brand || !form.tire_width || !form.tire_rim || !form.price_per_unit)) ||
                 (isPartChange && parts.length === 0)
               }
               className="w-full py-3.5 rounded-2xl font-semibold text-white bg-gradient-to-r from-primary to-primary-dark shadow-lg shadow-primary/25 disabled:opacity-40 disabled:shadow-none transition-all active:scale-[0.98] text-sm"
@@ -548,7 +561,7 @@ export default function QuickInput() {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-text-secondary">ขนาด</span>
-                      <span>{form.tire_size}</span>
+                      <span>{formatTireSize(form.tire_width, form.tire_aspect, form.tire_rim)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-text-secondary">ราคา/เส้น</span>

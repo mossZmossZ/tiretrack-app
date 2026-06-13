@@ -66,3 +66,8 @@ export function formatNumber(num) {
 export function getToday() {
   return new Date().toISOString().split('T')[0];
 }
+
+export function formatTireSize(width, aspect, rim) {
+  if (!width && !aspect && !rim) return '';
+  return `${width || ''}/${aspect || ''}R${rim || ''}`;
+}

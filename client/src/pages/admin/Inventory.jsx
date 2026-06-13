@@ -3,7 +3,7 @@ import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
 import { api } from '../../services/api.js';
 import { TIRE_BRANDS } from '../../utils/constants.js';
-import { formatCurrency, formatDate } from '../../utils/formatters.js';
+import { formatCurrency, formatDate, formatTireSize } from '../../utils/formatters.js';
 import BrandSelect from '../../components/BrandSelect.jsx';
 
 const MySwal = withReactContent(Swal);
@@ -22,7 +22,9 @@ export default function Inventory() {
   // Form state
   const [form, setForm] = useState({
     tire_brand: '',
-    tire_size: '',
+    tire_width: '',
+    tire_aspect: '',
+    tire_rim: '',
     tire_model: '',
     cost_price: ''
   });
@@ -157,7 +159,7 @@ export default function Inventory() {
   };
 
   const openAddModal = () => {
-    setForm({ tire_brand: '', tire_size: '', tire_model: '', cost_price: '' });
+    setForm({ tire_brand: '', tire_width: '', tire_aspect: '', tire_rim: '', tire_model: '', cost_price: '' });
     setIsAdding(true);
   };
 
@@ -165,7 +167,9 @@ export default function Inventory() {
     const brandLabel = TIRE_BRANDS.find(b => b.code === record.tire_brand)?.label || record.tire_brand;
     setForm({
       tire_brand: brandLabel,
-      tire_size: record.tire_size,
+      tire_width: record.tire_width,
+      tire_aspect: record.tire_aspect,
+      tire_rim: record.tire_rim,
       tire_model: record.tire_model,
       cost_price: record.cost_price
     });
@@ -178,11 +182,14 @@ export default function Inventory() {
   };
 
   // Filter records
-  const filteredRecords = records.filter(r => 
-    (r.tire_brand && r.tire_brand.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (r.tire_size && r.tire_size.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (r.tire_model && r.tire_model.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const filteredRecords = records.filter(r => {
+    const q = searchQuery.toLowerCase();
+    return (
+      (r.tire_brand && r.tire_brand.toLowerCase().includes(q)) ||
+      (formatTireSize(r.tire_width, r.tire_aspect, r.tire_rim).toLowerCase().includes(q)) ||
+      (r.tire_model && r.tire_model.toLowerCase().includes(q))
+    );
+  });
 
   const handleImport = async (file) => {
     if (!file) return;
@@ -299,7 +306,7 @@ export default function Inventory() {
                       <td className="px-4 py-3">
                         <span className="font-semibold text-text-primary">{brandLabel}</span>
                       </td>
-                      <td className="px-4 py-3 font-medium">{record.tire_size}</td>
+                      <td className="px-4 py-3 font-medium">{formatTireSize(record.tire_width, record.tire_aspect, record.tire_rim)}</td>
                       <td className="px-4 py-3 text-text-secondary">{record.tire_model || '-'}</td>
                       <td className="px-4 py-3 text-right font-semibold text-text-primary text-danger">
                         {formatCurrency(record.cost_price)}
@@ -350,15 +357,43 @@ export default function Inventory() {
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-text-secondary mb-1 block">ขนาดยาง *</label>
-                <input
-                  required
-                  type="text"
-                  placeholder="เช่น 215/45-17"
-                  value={form.tire_size}
-                  onChange={e => setForm({...form, tire_size: e.target.value})}
-                  className="w-full px-3 py-2 rounded-xl border border-border bg-surface-dim outline-none focus:border-primary"
-                />
+                <label className="text-xs font-semibold text-text-secondary mb-1.5 block">ขนาดยาง *</label>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    required
+                    type="number"
+                    placeholder="215"
+                    min="1"
+                    value={form.tire_width}
+                    onChange={e => setForm({...form, tire_width: e.target.value})}
+                    className="w-20 px-3 py-2 rounded-xl border border-border bg-surface-dim outline-none focus:border-primary text-center font-medium"
+                  />
+                  <span className="text-text-muted font-semibold text-lg">/</span>
+                  <input
+                    required
+                    type="number"
+                    placeholder="45"
+                    min="1"
+                    value={form.tire_aspect}
+                    onChange={e => setForm({...form, tire_aspect: e.target.value})}
+                    className="w-16 px-3 py-2 rounded-xl border border-border bg-surface-dim outline-none focus:border-primary text-center font-medium"
+                  />
+                  <span className="text-text-muted font-semibold text-base">R</span>
+                  <input
+                    required
+                    type="number"
+                    placeholder="17"
+                    min="1"
+                    value={form.tire_rim}
+                    onChange={e => setForm({...form, tire_rim: e.target.value})}
+                    className="w-16 px-3 py-2 rounded-xl border border-border bg-surface-dim outline-none focus:border-primary text-center font-medium"
+                  />
+                </div>
+                {form.tire_width && form.tire_aspect && form.tire_rim && (
+                  <p className="mt-1.5 text-xs text-text-muted">
+                    ขนาด: <span className="font-semibold text-primary">{formatTireSize(form.tire_width, form.tire_aspect, form.tire_rim)}</span>
+                  </p>
+                )}
               </div>
 
               <div>

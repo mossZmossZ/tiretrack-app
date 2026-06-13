@@ -11,7 +11,7 @@ const SAMPLE_DATA = {
   quantity: '4',
   tire_brand: 'MC',
   tire_model: 'Primacy 4',
-  tire_size: '205/55-16',
+  tire_size: '205/55R16',
   price_per_unit: '2500',
   total_price: '10000',
   notes: '',

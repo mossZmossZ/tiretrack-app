@@ -4,7 +4,14 @@ import { parseCSVLine, serializeRecords } from '../lib/csv.js';
 
 const COLLECTION = 'inventory';
 
-const HEADERS = ['id', 'tire_brand', 'tire_size', 'tire_model', 'cost_price', 'created_at'];
+const HEADERS = ['id', 'tire_brand', 'tire_width', 'tire_aspect', 'tire_rim', 'tire_model', 'cost_price', 'created_at'];
+
+function parseTireSize(raw) {
+  if (!raw || typeof raw !== 'string') return null;
+  const m = raw.trim().match(/^(\d+)\s*\/\s*(\d+)\s*[-R\s]\s*(\d+)$/i);
+  if (!m) return null;
+  return { tire_width: m[1], tire_aspect: m[2], tire_rim: m[3] };
+}
 
 function collection() {
   return getDb().collection(COLLECTION);
@@ -36,7 +43,9 @@ export async function create(data) {
   const record = {
     _id: id,
     tire_brand: data.tire_brand || '',
-    tire_size: data.tire_size || '',
+    tire_width: data.tire_width || '',
+    tire_aspect: data.tire_aspect || '',
+    tire_rim: data.tire_rim || '',
     tire_model: data.tire_model || '',
     cost_price: data.cost_price || '0',
     created_at: new Date().toISOString()
@@ -90,14 +99,19 @@ export async function importLegacy(csvContent) {
 
     try {
       const tire_brand = values[0]?.trim() || '';
-      const tire_size = values[1]?.trim() || '';
+      const rawSize = values[1]?.trim() || '';
       const tire_model = values[2]?.trim() || '';
       let cost_price = '0';
       if (values[3]) {
         cost_price = values[3].replace(/[,฿\s]/g, '').trim();
       }
 
-      await create({ tire_brand, tire_size, tire_model, cost_price });
+      const parsed = parseTireSize(rawSize);
+      const sizeFields = parsed
+        ? { tire_width: parsed.tire_width, tire_aspect: parsed.tire_aspect, tire_rim: parsed.tire_rim }
+        : { tire_width: rawSize, tire_aspect: '', tire_rim: '' };
+
+      await create({ tire_brand, ...sizeFields, tire_model, cost_price });
       imported++;
     } catch (err) {
       skipped++;

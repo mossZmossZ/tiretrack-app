@@ -18,10 +18,10 @@ router.get('/', async (req, res) => {
     const data = await inventoryService.readAll();
     // Sort logic (optional): A-Z by brand then size
     data.sort((a, b) => {
-      if (a.tire_brand === b.tire_brand) {
-        return a.tire_size.localeCompare(b.tire_size);
-      }
-      return a.tire_brand.localeCompare(b.tire_brand);
+      if (a.tire_brand !== b.tire_brand) return a.tire_brand.localeCompare(b.tire_brand);
+      if (Number(a.tire_width) !== Number(b.tire_width)) return Number(a.tire_width) - Number(b.tire_width);
+      if (Number(a.tire_aspect) !== Number(b.tire_aspect)) return Number(a.tire_aspect) - Number(b.tire_aspect);
+      return Number(a.tire_rim) - Number(b.tire_rim);
     });
     res.json({ success: true, data });
   } catch (err) {
@@ -35,9 +35,9 @@ router.get('/', async (req, res) => {
  */
 router.post('/', requireAdmin, async (req, res) => {
   try {
-    const { tire_brand, tire_size, cost_price } = req.body;
-    if (!tire_brand || !tire_size || !cost_price) {
-      return res.status(400).json({ success: false, error: 'กรุณากรอกยี่ห้อ ขนาด และราคาต้นทุน' });
+    const { tire_brand, tire_width, tire_rim, cost_price } = req.body;
+    if (!tire_brand || !tire_width || !tire_rim || !cost_price) {
+      return res.status(400).json({ success: false, error: 'กรุณากรอกยี่ห้อ ขนาดยาง และราคาต้นทุน' });
     }
     const record = await inventoryService.create(req.body);
     res.status(201).json({ success: true, data: record });
