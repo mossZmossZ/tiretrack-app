@@ -24,3 +24,4 @@ Thumbs.db
 
 # Stitch fetch (design tool artifacts)
 stitch-fetch/
+.claude/settings.local.json

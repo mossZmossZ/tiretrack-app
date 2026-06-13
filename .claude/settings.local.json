@@ -8,7 +8,8 @@
       "Bash(node --check services/service.service.js)",
       "Bash(node --check services/inventory.service.js)",
       "Bash(docker compose *)",
-      "Bash(git *)"
+      "Bash(git *)",
+      "Bash(npm run *)"
     ]
   },
   "enabledPlugins": {
