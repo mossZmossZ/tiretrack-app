@@ -4,6 +4,7 @@ import withReactContent from 'sweetalert2-react-content';
 import { api } from '../../services/api.js';
 import { TIRE_BRANDS } from '../../utils/constants.js';
 import { formatCurrency, formatDate } from '../../utils/formatters.js';
+import BrandSelect from '../../components/BrandSelect.jsx';
 
 const MySwal = withReactContent(Swal);
 
@@ -16,7 +17,8 @@ export default function Inventory() {
   const [editingRecord, setEditingRecord] = useState(null);
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
-  
+  const [customBrands, setCustomBrands] = useState([]);
+
   // Form state
   const [form, setForm] = useState({
     tire_brand: '',
@@ -37,6 +39,12 @@ export default function Inventory() {
   };
 
   useEffect(() => { loadData(); }, []);
+
+  useEffect(() => {
+    api.get('/tire-brands').then(res => {
+      if (res.success) setCustomBrands(res.data);
+    }).catch(() => {});
+  }, []);
 
   const handleDelete = async (id) => {
     const result = await MySwal.fire({
@@ -102,14 +110,61 @@ export default function Inventory() {
     }
   };
 
+  const handleAddBrand = async (name) => {
+    try {
+      const res = await api.post('/tire-brands', { name });
+      if (res.success) {
+        setCustomBrands(prev => [...prev, res.data]);
+        setForm(f => ({ ...f, tire_brand: name }));
+      }
+    } catch {}
+  };
+
+  const handleEditBrand = async (id, name) => {
+    const oldName = customBrands.find(b => b.id === id)?.name;
+    try {
+      const res = await api.put(`/tire-brands/${id}`, { name });
+      if (res.success) {
+        setCustomBrands(prev => prev.map(b => b.id === id ? { ...b, name } : b));
+        if (form.tire_brand === oldName) setForm(f => ({ ...f, tire_brand: name }));
+        MySwal.fire({ title: 'แก้ไขสำเร็จ!', icon: 'success', confirmButtonColor: '#F97316', timer: 1500, showConfirmButton: false });
+      } else {
+        MySwal.fire({ title: 'ผิดพลาด', text: res.error, icon: 'error', confirmButtonColor: '#F97316' });
+      }
+    } catch {
+      MySwal.fire({ title: 'ผิดพลาด', text: 'เกิดข้อผิดพลาด', icon: 'error', confirmButtonColor: '#F97316' });
+    }
+  };
+
+  const handleDeleteBrand = async (id) => {
+    const removed = customBrands.find(b => b.id === id);
+    // Optimistic remove
+    setCustomBrands(prev => prev.filter(b => b.id !== id));
+    if (form.tire_brand === removed?.name) setForm(f => ({ ...f, tire_brand: '' }));
+
+    try {
+      const res = await api.delete(`/tire-brands/${id}`);
+      if (res.success) {
+        MySwal.fire({ title: 'ลบสำเร็จ!', icon: 'success', confirmButtonColor: '#F97316', timer: 1200, showConfirmButton: false });
+      } else {
+        if (removed) setCustomBrands(prev => [...prev, removed].sort((a, b) => a.name.localeCompare(b.name)));
+        MySwal.fire({ title: 'ผิดพลาด', text: res.error, icon: 'error', confirmButtonColor: '#F97316' });
+      }
+    } catch {
+      if (removed) setCustomBrands(prev => [...prev, removed].sort((a, b) => a.name.localeCompare(b.name)));
+      MySwal.fire({ title: 'ผิดพลาด', text: 'เกิดข้อผิดพลาด', icon: 'error', confirmButtonColor: '#F97316' });
+    }
+  };
+
   const openAddModal = () => {
     setForm({ tire_brand: '', tire_size: '', tire_model: '', cost_price: '' });
     setIsAdding(true);
   };
 
   const openEditModal = (record) => {
+    const brandLabel = TIRE_BRANDS.find(b => b.code === record.tire_brand)?.label || record.tire_brand;
     setForm({
-      tire_brand: record.tire_brand,
+      tire_brand: brandLabel,
       tire_size: record.tire_size,
       tire_model: record.tire_model,
       cost_price: record.cost_price
@@ -284,13 +339,13 @@ export default function Inventory() {
             <form onSubmit={handleSave} className="space-y-4">
               <div>
                 <label className="text-xs font-semibold text-text-secondary mb-1 block">ยี่ห้อยาง *</label>
-                <input
-                  required
-                  type="text"
-                  placeholder="เช่น Michelin, Bridgestone, ฯลฯ"
+                <BrandSelect
                   value={form.tire_brand}
-                  onChange={e => setForm({...form, tire_brand: e.target.value})}
-                  className="w-full px-3 py-2 rounded-xl border border-border bg-surface-dim outline-none focus:border-primary"
+                  onChange={brand => setForm(f => ({ ...f, tire_brand: brand }))}
+                  customBrands={customBrands}
+                  onAdd={handleAddBrand}
+                  onEdit={handleEditBrand}
+                  onDelete={handleDeleteBrand}
                 />
               </div>
 
