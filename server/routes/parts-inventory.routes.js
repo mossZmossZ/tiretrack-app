@@ -1,9 +1,9 @@
 import { Router } from 'express';
-import { authMiddleware } from '../middleware/auth.middleware.js';
+import { requireAuth } from '../middleware/auth.middleware.js';
 import * as svc from '../services/parts-inventory.service.js';
 
 const router = Router();
-router.use(authMiddleware);
+router.use(requireAuth);
 
 router.get('/', async (req, res) => {
   try {
