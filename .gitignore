@@ -11,6 +11,9 @@ server/data/*.csv
 # Build output
 client/dist/
 
+# AI
+.claude/
+.agents
 # IDE
 .vscode/
 .idea/
@@ -26,3 +29,5 @@ Thumbs.db
 stitch-fetch/
 .claude/settings.local.json
 /inventory
+
+assets/
