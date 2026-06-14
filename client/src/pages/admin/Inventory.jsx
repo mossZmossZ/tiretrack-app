@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
 import { api } from '../../services/api.js';
-import { TIRE_BRANDS } from '../../utils/constants.js';
 import { formatCurrency, formatDate, formatTireSize } from '../../utils/formatters.js';
 import BrandSelect from '../../components/BrandSelect.jsx';
 
@@ -164,9 +163,8 @@ export default function Inventory() {
   };
 
   const openEditModal = (record) => {
-    const brandLabel = TIRE_BRANDS.find(b => b.code === record.tire_brand)?.label || record.tire_brand;
     setForm({
-      tire_brand: brandLabel,
+      tire_brand: record.tire_brand,
       tire_width: record.tire_width,
       tire_aspect: record.tire_aspect,
       tire_rim: record.tire_rim,
@@ -300,11 +298,10 @@ export default function Inventory() {
                 </tr>
               ) : (
                 filteredRecords.map(record => {
-                  const brandLabel = TIRE_BRANDS.find(b => b.code === record.tire_brand)?.label || record.tire_brand;
                   return (
                     <tr key={record.id} className="border-b border-border-light hover:bg-surface-dim/50 transition-colors">
                       <td className="px-4 py-3">
-                        <span className="font-semibold text-text-primary">{brandLabel}</span>
+                        <span className="font-semibold text-text-primary">{record.tire_brand}</span>
                       </td>
                       <td className="px-4 py-3 font-medium">{formatTireSize(record.tire_width, record.tire_aspect, record.tire_rim)}</td>
                       <td className="px-4 py-3 text-text-secondary">{record.tire_model || '-'}</td>

@@ -180,7 +180,7 @@ export default function ServiceLog() {
                       <td className="px-4 py-3 text-text-secondary">
                         {record.service_type === 'tire_change' ? (
                           <span>
-                            {TIRE_BRANDS.find(b => b.code === record.tire_brand)?.label || record.tire_brand}
+                            {record.tire_brand}
                             {record.tire_model ? ` ${record.tire_model}` : ''}
                             {record.tire_size ? ` (${record.tire_size})` : ''}
                             {record.quantity ? ` × ${record.quantity}` : ''}
