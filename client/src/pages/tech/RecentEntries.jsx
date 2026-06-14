@@ -99,6 +99,11 @@ export default function RecentEntries() {
                         {record.cost_price && Number(record.cost_price) > 0 ? ` · ต้นทุน ${formatCurrency(record.cost_price)}` : ''}
                       </p>
                     )}
+                    {record.service_type === 'part_change' && Array.isArray(record.parts) && record.parts.length > 0 && (
+                      <p className="text-xs text-text-muted mt-1">
+                        {record.parts.map(p => `${p.name} ×${p.qty}`).join(', ')}
+                      </p>
+                    )}
                     <div className="flex items-center justify-between mt-2">
                       <span className="font-bold text-primary text-sm">{formatCurrency(record.total_price)}</span>
                       {canUndo && (

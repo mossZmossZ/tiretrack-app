@@ -16,7 +16,8 @@ const NAV_GROUPS = [
   {
     label: 'Inventory',
     items: [
-      { to: '/admin/inventory', icon: 'inventory_2', label: 'ฐานข้อมูลยาง' },
+      { to: '/admin/inventory', icon: 'tire_repair', label: 'ฐานข้อมูลยาง' },
+      { to: '/admin/parts-inventory', icon: 'build', label: 'คลังอะไหล่' },
     ],
   },
   {
@@ -24,8 +25,8 @@ const NAV_GROUPS = [
     items: [
       { to: '/admin/import', icon: 'upload_file', label: 'นำเข้า/ส่งออก' },
       { to: '/admin/backup', icon: 'cloud_sync', label: 'สำรองข้อมูล' },
-      { to: '/admin/receipt', icon: 'receipt_long', label: 'ใบเสร็จ' },
-      { to: '/admin/recycle', icon: 'delete_sweep', label: 'ถังขยะ' },
+      { to: '/admin/receipt', icon: 'receipt_long', label: 'ตั้งค่าใบกำกับภาษี' },
+      { to: '/admin/cashbill', icon: 'receipt', label: 'ตั้งค่าบิลเงินสด' },
     ],
   },
 ];
@@ -35,9 +36,10 @@ function NavItem({ to, icon, label }) {
     <NavLink
       to={to}
       className={({ isActive }) =>
-        `flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${isActive
-          ? 'bg-primary text-white font-semibold shadow-sm shadow-primary/20'
-          : 'text-text-secondary hover:bg-surface-dim hover:text-text-primary'
+        `flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${
+          isActive
+            ? 'bg-primary text-white font-semibold shadow-sm shadow-primary/20'
+            : 'text-text-secondary hover:bg-surface-dim hover:text-text-primary'
         }`
       }
     >

@@ -4,6 +4,7 @@ export const SERVICE_TYPES = [
   { value: 'wheel_alignment', label: 'ตั้งศูนย์ล้อ', icon: 'straighten', color: '#8B5CF6' },
   { value: 'tire_switch', label: 'สลับยาง', icon: 'swap_horiz', color: '#10B981' },
   { value: 'tire_pressure', label: 'เช็คลมยาง', icon: 'speed', color: '#F59E0B' },
+  { value: 'part_change', label: 'เปลี่ยนอะไหล่', icon: 'build', color: '#EC4899' },
 ];
 
 export const SERVICE_TYPE_MAP = Object.fromEntries(SERVICE_TYPES.map(s => [s.value, s]));
@@ -23,18 +24,6 @@ export const TIRE_BRANDS = [
   { code: 'SP', label: 'Sportrak' },
   { code: 'FS', label: 'Firestone' },
   { code: 'OT', label: 'อื่นๆ' },
-];
-
-export const TIRE_SIZES = [
-  '175/65-14', '185/55-15', '185/60-15', '185/65-15',
-  '195/50-15', '195/55-15', '195/60-15', '195/65-15',
-  '205/45-17', '205/55-16', '205/60-16',
-  '215/45-17', '215/50-17', '215/55-17', '215/60-16', '215/70-15',
-  '225/45-17', '225/45-18', '225/55-17', '225/65-17',
-  '235/55-18', '235/60-18',
-  '245/40-18', '245/45-18',
-  '255/70-15',
-  '265/50-20', '265/65-17', '265/70-16',
 ];
 
 export const CAR_COLORS = [

@@ -15,7 +15,7 @@ It replaces manual logbooks and Google Sheets with a streamlined digital service
 - **Record** all tire shop services (tire changes, wheel balance, alignment, etc.)
 - **Search** vehicle history by license plate (ทะเบียนรถ)
 - **Analyze** business data via admin dashboard
-- **Backup** data to CSV files (Phase 1) and Google Sheets (Phase 2) for manual fallback
+- **Backup** data from MongoDB to S3 (CSV-formatted snapshots), with import/export to CSV for manual fallback
 
 ### Service Types
 
@@ -26,6 +26,7 @@ It replaces manual logbooks and Google Sheets with a streamlined digital service
 | Wheel Alignment   | ตั้งศูนย์ล้อ     | Minimal (date, plate, price, notes) |
 | Tire Switch       | สลับยาง          | Minimal (date, plate, price, notes) |
 | Tire Pressure     | เช็คลมยาง        | Minimal (date, plate, price, notes) |
+| Part Change       | เปลี่ยนอะไหล่   | Line-items (multiple parts per service, each with name, qty, price_per_unit) |
 
 ### Users
 
@@ -60,15 +61,17 @@ No user accounts, no OAuth. Small business — keep it simple.
 | ----------- | ------- | ---------------------------- |
 | Node.js     | 20+     | Runtime                      |
 | Express.js  | 4+      | HTTP server & API framework  |
-| csv-parser / csv-writer | — | CSV read/write          |
+| MongoDB     | 7       | Primary data store           |
+| mongodb (driver) | 6+ | Native Node Mongo driver     |
 | dotenv      | —       | Environment config           |
 
 ### Data Layer
 
-| Phase   | Storage       | Purpose                        |
-| ------- | ------------- | ------------------------------ |
-| Phase 1 | CSV files     | Local flat-file, easy to debug |
-| Phase 5 | MinIO S3      | Auto-backup and manual restore |
+| Layer        | Storage       | Purpose                                |
+| ------------ | ------------- | -------------------------------------- |
+| Primary      | MongoDB 7     | Live data store (services, inventory)  |
+| Import/Export| CSV (in-app)  | Admin upload/download for spreadsheet workflows |
+| Backup       | MinIO S3      | CSV snapshots produced from MongoDB, restore via CSV reload |
 
 ### Design System
 
@@ -105,6 +108,8 @@ tiretrack-app/
 │   │   │   └── tech/           # Technician pages
 │   │   │       ├── QuickInput.jsx
 │   │   │       └── RecentEntries.jsx
+│   │   │   ├── admin/
+│   │   │   │   ├── PartsInventory.jsx  # คลังอะไหล่ CRUD page
 │   │   ├── contexts/
 │   │   │   └── AuthContext.jsx  # PIN auth state
 │   │   ├── services/
@@ -125,19 +130,25 @@ tiretrack-app/
 │
 ├── server/                      # Node.js + Express backend
 │   ├── routes/
-│   │   ├── auth.routes.js       # POST /api/auth/login
-│   │   └── service.routes.js    # CRUD /api/services
-│   ├── controllers/
-│   │   ├── auth.controller.js
-│   │   └── service.controller.js
+│   │   ├── auth.routes.js              # POST /api/auth/login
+│   │   ├── service.routes.js           # CRUD /api/services
+│   │   ├── inventory.routes.js         # CRUD /api/inventory
+│   │   ├── parts-inventory.routes.js   # CRUD /api/parts-inventory
+│   │   └── backup.routes.js            # Backup/restore endpoints
 │   ├── services/
-│   │   └── csv.service.js       # CSV read/write/append logic
+│   │   ├── service.service.js          # MongoDB ops for `services` collection
+│   │   ├── inventory.service.js        # MongoDB ops for `inventory` collection
+│   │   ├── parts-inventory.service.js  # MongoDB ops for `parts_inventory` collection
+│   │   └── backup.service.js           # Mongo → CSV → S3 backup & restore
+│   ├── db/
+│   │   └── mongo.js             # Connection lifecycle (connect/getDb/close)
+│   ├── lib/
+│   │   └── csv.js               # Shared CSV serialize/parse helpers
 │   ├── middleware/
 │   │   └── auth.middleware.js   # PIN session token check
-│   ├── data/                    # CSV data storage (gitignored)
-│   │   ├── services.csv         # Main service records
-│   │   └── legacy/              # Imported legacy data
-│   ├── index.js                 # Express entry point
+│   ├── data/                    # On-disk config only
+│   │   └── backup-config.json   # Auto-backup cron settings & status
+│   ├── index.js                 # Express entry point (connects Mongo on boot)
 │   └── package.json
 │
 ├── docs/
@@ -172,16 +183,22 @@ tiretrack-app/
 │               ▼                                      │
 │           EXPRESS API                                 │
 │  ┌─────────────────────────┐                         │
-│  │   Routes → Controllers  │                         │
+│  │   Routes (async)        │                         │
 │  └────────────┬────────────┘                         │
 │               │                                      │
 │  ┌────────────▼────────────┐                         │
-│  │   CSV Service Layer     │  ← Phase 1              │
-│  │   (Google Sheets Layer) │  ← Phase 2              │
+│  │   Service Modules       │  service / inventory    │
+│  │   (Mongo driver calls)  │  + CSV import/export    │
 │  └────────────┬────────────┘                         │
 │               │                                      │
 │  ┌────────────▼────────────┐                         │
-│  │   /server/data/*.csv    │  ← Flat-file storage    │
+│  │   MongoDB (Docker)      │  ← Primary store        │
+│  │   tiretrack DB:         │                         │
+│  │     services / inventory│                         │
+│  └────────────┬────────────┘                         │
+│               │  CSV snapshots                       │
+│  ┌────────────▼────────────┐                         │
+│  │   MinIO / S3            │  ← Backup target        │
 │  └─────────────────────────┘                         │
 └─────────────────────────────────────────────────────┘
 ```
@@ -202,12 +219,16 @@ tiretrack-app/
 | GET    | `/api/services/stats`     | Admin    | Dashboard statistics           |
 | POST   | `/api/services/import`    | Admin    | Import legacy CSV              |
 | GET    | `/api/services/export`    | Admin    | Export all data as CSV         |
-| GET    | `/api/inventory`          | Any      | List all inventory (used by Tech input) |
-| POST   | `/api/inventory`          | Admin    | Create new tire model/cost price |
-| PUT    | `/api/inventory/:id`      | Admin    | Edit tire model or price       |
-| DELETE | `/api/inventory/:id`      | Admin    | Delete tire model              |
-| POST   | `/api/inventory/import`   | Admin    | Bulk Import tire inventory     |
-| GET    | `/api/inventory/export`   | Admin    | Export tire inventory          |
+| GET    | `/api/inventory`               | Any      | List all tire inventory (used by Tech input) |
+| POST   | `/api/inventory`               | Admin    | Create new tire model/cost price |
+| PUT    | `/api/inventory/:id`           | Admin    | Edit tire model or price       |
+| DELETE | `/api/inventory/:id`           | Admin    | Delete tire model              |
+| POST   | `/api/inventory/import`        | Admin    | Bulk Import tire inventory     |
+| GET    | `/api/inventory/export`        | Admin    | Export tire inventory          |
+| GET    | `/api/parts-inventory`         | Any      | List all spare parts (used by Tech input) |
+| POST   | `/api/parts-inventory`         | Admin    | Create new spare part          |
+| PUT    | `/api/parts-inventory/:id`     | Admin    | Edit spare part                |
+| DELETE | `/api/parts-inventory/:id`     | Admin    | Delete spare part              |
 
 ---
 
@@ -244,12 +265,182 @@ tiretrack-app/
 
 ## 8. Data Reference
 
-- See `docs/csv-design.md` for the complete CSV schema and data dictionary
-- Legacy data format reference is documented there with mapping rules
+- See `docs/csv-design.md` for the field-level data dictionary. The same field set is now stored as MongoDB documents — the headers in `csv-design.md` correspond 1:1 with document keys.
+- The `id` field on the wire maps to MongoDB's `_id` (stored as a string UUID, preserving the original CSV-era IDs).
+- All values are stored as **strings** to match the legacy CSV behaviour. Numeric coercion (`Number(total_price)`, etc.) happens at the point of use, not at the storage layer.
+- Legacy data format reference (with mapping rules) remains in `docs/csv-design.md` — the admin `Import CSV` feature still ingests that format.
+
+### Collections
+
+| Collection        | Purpose                                        | `_id` shape       |
+| ----------------- | ---------------------------------------------- | ----------------- |
+| `services`        | Service records (all types incl. part_change)  | 8-char UUID slice |
+| `inventory`       | Tire SKUs with brand/size/cost                 | Full UUID         |
+| `parts_inventory` | Spare part catalogue (name, category, cost)    | Full UUID         |
+
+#### `part_change` service records
+
+When `service_type === 'part_change'`, the service document carries a `parts` array instead of tire fields:
+
+```json
+{
+  "service_type": "part_change",
+  "parts": [
+    { "part_id": "uuid", "name": "น้ำมันเครื่อง Shell Helix", "category": "น้ำมันเครื่อง", "qty": 2, "price_per_unit": "240", "cost_price": "200" }
+  ],
+  "total_price": "480"
+}
+```
+
+`total_price` is auto-calculated server-side as `sum(price_per_unit × qty)` if not provided. Name and price are **snapshotted** onto each line item at save time so historical records are unaffected by future catalogue edits.
+
+No secondary indexes are created — the dataset is small enough that the auto `_id` index covers the only by-key lookup pattern. Add indexes here if the dataset grows.
 
 ---
 
-## 9. Phase Roadmap
+## 8.1 Database (MongoDB) — Setup
+
+MongoDB is provisioned via `docker-compose.yml` at the repo root. The Node app connects on boot and exits if Mongo is unreachable.
+
+### One-time setup
+
+1. **Copy env template**
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   Edit `.env` and change `MONGO_ROOT_PASSWORD` (and the password inside `MONGODB_URI` — they must match).
+
+2. **Install deps**
+
+   ```bash
+   npm install
+   ```
+
+3. **Start MongoDB**
+
+   ```bash
+   docker compose up -d
+   ```
+
+   Wait for the container to be healthy:
+
+   ```bash
+   docker compose ps
+   ```
+
+4. **Start the app**
+
+   ```bash
+   npm run dev
+   ```
+
+   The server logs `🍃 Mongo connected` before `🚗 TireTrack API running...`.
+
+### Day-to-day
+
+| Action                 | Command                             |
+| ---------------------- | ----------------------------------- |
+| Start Mongo            | `docker compose up -d`              |
+| Stop Mongo             | `docker compose stop`               |
+| Tail Mongo logs        | `docker compose logs -f mongo`      |
+| Shell into Mongo       | `docker compose exec mongo mongosh -u "$MONGO_ROOT_USERNAME" -p "$MONGO_ROOT_PASSWORD" --authenticationDatabase admin` |
+| Wipe the database      | `docker compose down -v` (drops the named volume `mongo_data`) |
+
+### Environment variables
+
+| Variable               | Used by         | Purpose                                                   |
+| ---------------------- | --------------- | --------------------------------------------------------- |
+| `MONGO_ROOT_USERNAME`  | docker-compose  | Root user provisioned at container init                   |
+| `MONGO_ROOT_PASSWORD`  | docker-compose  | Root password provisioned at container init               |
+| `MONGODB_URI`          | Node server     | Full connection URI (credentials must match the two above)|
+| `MONGODB_DB`           | Node server     | Database name (default `tiretrack`)                       |
+
+### Choosing the right `MONGODB_URI` host
+
+The host portion of `MONGODB_URI` depends on your Docker runtime:
+
+| Runtime                          | Use                                                  |
+| -------------------------------- | ---------------------------------------------------- |
+| **OrbStack** (macOS)             | `tiretrack-mongo.orb.local:27017` — the container's auto-assigned DNS. The `127.0.0.1:27017` port forwarder under OrbStack breaks Mongo's wire-protocol handshake (`ECONNRESET` during SCRAM auth). |
+| **Docker Desktop** / Linux       | `127.0.0.1:27017` — note: **not** `localhost`. Node 18+ resolves `localhost` to IPv6 first; Docker's IPv4-only port mapping then drops the connection. |
+
+### CSV import/export still works
+
+The CSV import/export feature is **not** the storage layer anymore — it's an admin convenience for spreadsheet workflows.
+
+- **Export** (`GET /api/services/export`, `GET /api/inventory/export`) reads from Mongo and serializes to CSV (UTF-8 + BOM for Excel/Thai).
+- **Import** (`POST /api/services/import`, `POST /api/inventory/import`) parses the legacy CSV format and inserts rows into Mongo.
+
+### Backup / Restore against S3
+
+`backup.service.js` now:
+
+- **Backup**: reads each collection from Mongo, renders CSV, uploads `services.csv` and `inventory.csv` to S3 (same object keys as before — existing CSV backups remain restorable).
+- **Restore**: downloads each `*.csv` from S3, parses it, **wipes the target collection** (`deleteMany({})`) and bulk-inserts. The wire-format on S3 is unchanged; only the post-download path is different.
+- Auto-backup cron and the `backup-config.json` file on disk are unchanged.
+
+### Production hardening checklist
+
+The default `docker-compose.yml` is tuned for local development. Before deploying to a shared/production host:
+
+- [ ] Change `MONGO_ROOT_PASSWORD` to a long random value.
+- [ ] Restrict the published port further (currently `127.0.0.1:27017:27017`) or remove the `ports:` mapping entirely if the backend runs on the same Docker network.
+- [ ] Create a non-root application user (`db.createUser(...)`) scoped to the `tiretrack` DB and switch `MONGODB_URI` over to it.
+- [ ] Enable TLS for Mongo connections if the database lives off-host.
+- [ ] Schedule S3 backups via the admin UI (Phase 5 backup config).
+
+---
+
+---
+
+## 9. Receipt / Bill System
+
+Two receipt types are supported. Both are client-side only (no server involvement) — config is stored in `localStorage` and documents are printed via `window.print()`.
+
+### ใบกำกับภาษีอย่างย่อ (Tax Invoice)
+
+| Item | Detail |
+| ---- | ------ |
+| Settings route | `/admin/receipt` |
+| Sidebar label | ตั้งค่าใบกำกับภาษี |
+| localStorage key | `tiretrack_receipt_config` |
+| Config fields | `shop_name` (required), `tax_id` (required, 13 digits), `address` (optional), `vat_registered` (bool) |
+| Document heading | ใบกำกับภาษีอย่างย่อ |
+| VAT breakdown | Shown when `vat_registered = true` |
+
+### บิลเงินสด (Cash Bill)
+
+| Item | Detail |
+| ---- | ------ |
+| Settings route | `/admin/cashbill` |
+| Sidebar label | ตั้งค่าบิลเงินสด |
+| localStorage key | `tiretrack_cashbill_config` |
+| Config fields | `address` (optional only) |
+| Document heading | บิลเงินสด |
+| VAT breakdown | Never shown |
+
+### Print flow (QuickInput / Tech view)
+
+After saving a service, two buttons appear side by side:
+- **พิมพ์ใบกำกับภาษี** — opens `ReceiptModal` using `tiretrack_receipt_config`
+- **พิมพ์บิลเงินสด** — opens `CashBillModal` using `tiretrack_cashbill_config`
+
+Both modals render `ReceiptDocument` with the appropriate `type` prop (`'tax_invoice'` or `'cash_bill'`).
+
+### Key files
+
+| File | Role |
+| ---- | ---- |
+| `client/src/components/ReceiptDocument.jsx` | Shared document renderer; `type` prop controls header/heading/VAT |
+| `client/src/utils/receiptStorage.js` | localStorage read/write for both configs |
+| `client/src/pages/admin/ReceiptSettings.jsx` | ใบกำกับภาษี settings page |
+| `client/src/pages/admin/CashBillSettings.jsx` | บิลเงินสด settings page |
+
+---
+
+## 10. Phase Roadmap
 
 | Phase | Scope | Status |
 | ----- | ----- | ------ |
@@ -258,10 +449,13 @@ tiretrack-app/
 | Phase 3 | SweetAlert confirmations, Resilient API timeouts, UI polish | ✅ Done |
 | Phase 4 | Tire Inventory System, Dynamic Cost & Net Profit tracking, Inventory Import/Export | ✅ Done |
 | Phase 5 | S3 Backup & Restore, Auto-backup scheduling with MinIO | ✅ Done |
-| Phase 6 | Google Sheets integration, Advanced analytics | 📋 Planned |
-| Phase 7 | Docker/K8s deployment, Performance optimization | 📋 Planned |
+| Phase 6 | MongoDB migration (CSV → Mongo), docker-compose for local Mongo | ✅ Done |
+| Phase 6.1 | Dual receipt types: ใบกำกับภาษีอย่างย่อ and บิลเงินสด | ✅ Done |
+| Phase 6.2 | เปลี่ยนอะไหล่ service type with คลังอะไหล่ (spare parts inventory, line-items per service) | ✅ Done |
+| Phase 7 | Google Sheets integration, Advanced analytics | 📋 Planned |
+| Phase 8 | Docker/K8s deployment, Performance optimization | 📋 Planned |
 
 ---
 
-*Last updated: 2026-04-18*
+*Last updated: 2026-06-06*
 *Maintainer: Staff Software Engineer (AI)*

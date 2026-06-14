@@ -3,12 +3,22 @@ import cron from 'node-cron';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { exportAll, importCurrentCSV } from './csv.service.js';
-import { getCSVContent, importCurrentCSV as importInventoryCSV } from './inventory.service.js';
+import { getDb } from '../db/mongo.js';
+import { serializeRecords, parseCSV } from '../lib/csv.js';
+import { SERVICE_HEADERS } from './service.service.js';
+import { INVENTORY_HEADERS } from './inventory.service.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.join(__dirname, '../data');
 const configPath = path.join(dataDir, 'backup-config.json');
+
+// Maps each S3 object key to the collection it represents and the column order
+// to serialize/parse. Keeps S3 layout identical to the CSV-era so existing
+// backups remain restorable.
+const BACKUP_TARGETS = [
+  { filename: 'services.csv', collection: 'services', headers: SERVICE_HEADERS },
+  { filename: 'inventory.csv', collection: 'inventory', headers: INVENTORY_HEADERS },
+];
 
 let s3Client = null;
 let currentCronJob = null;
@@ -17,7 +27,7 @@ export const getConfig = () => {
   if (!fs.existsSync(configPath)) {
     return {
       autoEnabled: false,
-      schedule: '0 2 * * *',
+      schedule: '0 2 * * *', // Daily at 2 AM
       lastBackup: null,
       lastStatus: null,
     };
@@ -26,7 +36,9 @@ export const getConfig = () => {
 };
 
 const saveConfig = (config) => {
-  if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+  if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+  }
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 };
 
@@ -48,6 +60,7 @@ const initS3 = () => {
     if (!process.env.S3_ENDPOINT || !process.env.S3_BUCKET || !process.env.S3_ACCESS_KEY || !process.env.S3_SECRET_KEY) {
       throw new Error('S3 configuration is missing in .env');
     }
+
     s3Client = new S3Client({
       region: process.env.S3_REGION || 'us-east-1',
       endpoint: process.env.S3_ENDPOINT,
@@ -55,38 +68,55 @@ const initS3 = () => {
         accessKeyId: process.env.S3_ACCESS_KEY,
         secretAccessKey: process.env.S3_SECRET_KEY,
       },
-      forcePathStyle: true,
+      forcePathStyle: true, // Required for MinIO
     });
   }
   return s3Client;
 };
 
+// Project a Mongo doc into the CSV-shaped object the headers expect:
+// _id is exposed as `id`; all other fields default to empty string.
+const docToCsvRow = (doc, headers) => {
+  const { _id, ...rest } = doc;
+  const row = { id: _id };
+  for (const h of headers) {
+    if (h === 'id') continue;
+    row[h] = rest[h] ?? '';
+  }
+  return row;
+};
+
+// Reverse: a CSV row uses `id`, but Mongo stores it as `_id`.
+const csvRowToDoc = (row) => {
+  const { id, ...rest } = row;
+  return { _id: id, ...rest };
+};
+
 export const backupNow = async () => {
   const client = initS3();
   const bucket = process.env.S3_BUCKET;
-
-  // Export MongoDB data as CSV and upload to S3
-  const [servicesCsv, inventoryCsv] = await Promise.all([exportAll(), getCSVContent()]);
-
-  const uploads = [
-    { key: 'services.csv', body: servicesCsv },
-    { key: 'inventory.csv', body: inventoryCsv },
-  ];
+  const db = getDb();
 
   const results = [];
-  for (const { key, body } of uploads) {
+
+  for (const { filename, collection, headers } of BACKUP_TARGETS) {
+    const docs = await db.collection(collection).find({}).toArray();
+    const rows = docs.map(d => docToCsvRow(d, headers));
+    const csv = serializeRecords(headers, rows);
+
     const command = new PutObjectCommand({
       Bucket: bucket,
-      Key: key,
-      Body: Buffer.from(body, 'utf-8'),
-      ContentType: 'text/csv',
+      Key: filename,
+      Body: csv,
+      ContentType: 'text/csv'
     });
+
     try {
       await client.send(command);
-      results.push({ file: key, status: 'success' });
+      results.push({ file: filename, status: 'success', records: docs.length });
     } catch (error) {
-      console.error(`Backup failed for ${key}:`, error);
-      throw new Error(`Failed to upload ${key} to S3: ${error.message}`);
+      console.error(`Backup failed for ${filename}:`, error);
+      throw new Error(`Failed to upload ${filename} to S3: ${error.message}`);
     }
   }
 
@@ -98,6 +128,7 @@ export const backupNow = async () => {
   return results;
 };
 
+// Stream to Buffer helper for S3
 const streamToBuffer = async (stream) => {
   return new Promise((resolve, reject) => {
     const chunks = [];
@@ -110,26 +141,37 @@ const streamToBuffer = async (stream) => {
 export const restoreBackup = async () => {
   const client = initS3();
   const bucket = process.env.S3_BUCKET;
-
-  const restores = [
-    { key: 'services.csv', importer: importCurrentCSV },
-    { key: 'inventory.csv', importer: importInventoryCSV },
-  ];
+  const db = getDb();
 
   const results = [];
-  for (const { key, importer } of restores) {
-    const command = new GetObjectCommand({ Bucket: bucket, Key: key });
+
+  for (const { filename, collection, headers } of BACKUP_TARGETS) {
+    const command = new GetObjectCommand({
+      Bucket: bucket,
+      Key: filename,
+    });
+
     try {
       const response = await client.send(command);
       const buffer = await streamToBuffer(response.Body);
-      await importer(buffer.toString('utf-8'));
-      results.push({ file: key, status: 'success' });
+      const csv = buffer.toString('utf-8');
+      const rows = parseCSV(csv, headers);
+      const docs = rows.map(csvRowToDoc).filter(d => d._id);
+
+      // Destructive replace: matches the CSV-era behaviour where the S3 file
+      // overwrote the local file outright.
+      await db.collection(collection).deleteMany({});
+      if (docs.length > 0) {
+        await db.collection(collection).insertMany(docs);
+      }
+
+      results.push({ file: filename, status: 'success', records: docs.length });
     } catch (error) {
-      console.error(`Restore failed for ${key}:`, error);
+      console.error(`Restore failed for ${filename}:`, error);
       if (error.name === 'NoSuchKey') {
-        results.push({ file: key, status: 'skipped', reason: 'Not found in backup' });
+        results.push({ file: filename, status: 'skipped', reason: 'Not found in backup' });
       } else {
-        throw new Error(`Failed to restore ${key} from S3: ${error.message}`);
+        throw new Error(`Failed to download ${filename} from S3: ${error.message}`);
       }
     }
   }
