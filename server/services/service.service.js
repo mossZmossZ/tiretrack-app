@@ -4,6 +4,11 @@ import { parseCSVLine, serializeRecords } from '../lib/csv.js';
 
 const COLLECTION = 'services';
 
+function localDateStr(d = new Date()) {
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
 const HEADERS = [
   'id', 'date', 'license_plate', 'province', 'car_model', 'car_color',
   'service_type', 'quantity', 'tire_brand', 'tire_model', 'tire_size',
@@ -51,7 +56,7 @@ export async function create(data, createdBy = 'tech') {
 
   const record = {
     _id: id,
-    date: data.date || new Date().toISOString().split('T')[0],
+    date: data.date || localDateStr(),
     license_plate: data.license_plate || '',
     province: data.province || '',
     car_model: data.car_model || '',
@@ -116,8 +121,8 @@ export async function getStats() {
   const all = docs.map(toApi);
 
   const now = new Date();
-  const today = now.toISOString().split('T')[0];
-  const weekAgo = new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const today = localDateStr(now);
+  const weekAgo = localDateStr(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7));
   const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
 
   const todayRecords = all.filter(r => r.date === today);
@@ -135,9 +140,10 @@ export async function getStats() {
   });
 
   const monthlyRevenue = {};
+  const validMonth = /^\d{4}-\d{2}$/;
   all.forEach(r => {
     const month = r.date?.slice(0, 7);
-    if (month) {
+    if (month && validMonth.test(month) && Number(month.slice(0, 4)) >= 2000) {
       monthlyRevenue[month] = (monthlyRevenue[month] || 0) + Number(r.total_price || 0);
     }
   });

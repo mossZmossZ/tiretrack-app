@@ -9,7 +9,16 @@
       "Bash(node --check services/inventory.service.js)",
       "Bash(docker compose *)",
       "Bash(git *)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(grep -c \"^,,,,,,,,,,,,,\\\\?$\" /mnt/c/Users/Nattavee/Documents/GitHub/tiretrack-app/inventory/PBY-Customer.csv)",
+      "Bash(grep -c \"^$\" /mnt/c/Users/Nattavee/Documents/GitHub/tiretrack-app/inventory/PBY-Customer.csv)",
+      "Bash(grep -v \"^$\\\\|^0$\\\\|^-\")",
+      "Bash(node *)",
+      "Bash(awk -F, 'NR>1 && $5 ~ /\\\\// {print NR\": \"$0}' /mnt/c/Users/Nattavee/Documents/GitHub/tiretrack-app/inventory/PBY-Customer-cleaned.csv)",
+      "Bash(awk -F, 'NR>1 {print $7}' /mnt/c/Users/Nattavee/Documents/GitHub/tiretrack-app/inventory/PBY-Customer-cleaned.csv)",
+      "Bash(grep -E \"^นอก|^ใน|ลอง$|รอง$\")",
+      "Bash(grep -E \"กรมป่า|มิตรสิน|ชับยุทธ|รร ศรี|ป้ายแดง|ดีมาก|ดีมาด|ยาก|ที่ดิน|บัญชี|น้องอาม|กร802|พรีรัน|รถกระเช้า|รถตู้|รถน้ำ|รถอีกคัน|ชุด$|ลงเป็น|1200โปร|8ลิตร|กระกะ\")",
+      "Bash(grep -v \"^$\")"
     ]
   },
   "enabledPlugins": {

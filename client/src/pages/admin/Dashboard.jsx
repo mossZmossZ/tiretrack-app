@@ -50,10 +50,16 @@ export default function Dashboard() {
     : null;
 
   // Revenue chart — last 12 months
+  const THAI_MONTH_SHORT = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
   const revenueData = Object.entries(stats.monthlyRevenue)
     .sort((a, b) => a[0].localeCompare(b[0]))
     .slice(-12)
-    .map(([month, revenue]) => ({ month: month.slice(2), revenue }));
+    .map(([month, revenue]) => {
+      const [yearStr, mStr] = month.split('-');
+      const yearShort = String(Number(yearStr)).slice(-2);
+      const monthLabel = THAI_MONTH_SHORT[Number(mStr) - 1] || mStr;
+      return { month: `${monthLabel} ${yearShort}`, revenue };
+    });
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -136,7 +142,7 @@ export default function Dashboard() {
               />
               <Tooltip
                 formatter={v => [formatCurrency(v), 'รายรับ']}
-                labelFormatter={l => `เดือน ${l}`}
+                labelFormatter={l => l}
                 contentStyle={{
                   borderRadius: '12px',
                   border: 'none',

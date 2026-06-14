@@ -2,5 +2,5 @@
   "autoEnabled": true,
   "schedule": "0 2 * * *",
   "lastBackup": "2026-05-10T07:59:11.510Z",
-  "lastStatus": "success"
+  "lastStatus": "failed: Failed to upload services.csv to S3: getaddrinfo ENOTFOUND s3.example.com"
 }
