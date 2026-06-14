@@ -121,6 +121,34 @@ router.post('/', async (req, res) => {
 });
 
 /**
+ * DELETE /api/services/bill/:bill_id
+ * Delete all service records belonging to a bill (undo multi-service entry)
+ */
+router.delete('/bill/:bill_id', async (req, res) => {
+  try {
+    const records = await serviceService.findByBillId(req.params.bill_id);
+    if (!records.length) {
+      return res.status(404).json({ success: false, error: 'ไม่พบข้อมูล' });
+    }
+    if (req.user.role === 'tech') {
+      const thirtyMinutes = 30 * 60 * 1000;
+      for (const r of records) {
+        if (r.created_by !== 'tech') {
+          return res.status(403).json({ success: false, error: 'ไม่มีสิทธิ์ลบข้อมูลนี้' });
+        }
+        if (Date.now() - new Date(r.created_at).getTime() > thirtyMinutes) {
+          return res.status(403).json({ success: false, error: 'เกินเวลาที่อนุญาตให้ยกเลิก (30 นาที)' });
+        }
+      }
+    }
+    await serviceService.deleteByBillId(req.params.bill_id);
+    res.json({ success: true, message: 'ลบข้อมูลสำเร็จ' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+/**
  * DELETE /api/services/:id
  * Technician can only delete records they created recently
  */

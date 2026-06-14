@@ -7,7 +7,7 @@ const COLLECTION = 'services';
 const HEADERS = [
   'id', 'date', 'license_plate', 'province', 'car_model', 'car_color',
   'service_type', 'quantity', 'tire_brand', 'tire_model', 'tire_size',
-  'price_per_unit', 'total_price', 'technician', 'notes', 'cost_price', 'created_at', 'created_by'
+  'price_per_unit', 'total_price', 'technician', 'notes', 'cost_price', 'bill_id', 'created_at', 'created_by'
 ];
 
 function collection() {
@@ -66,6 +66,7 @@ export async function create(data, createdBy = 'tech') {
     technician: data.technician || '',
     notes: data.notes || '',
     cost_price: data.cost_price || '0',
+    bill_id: data.bill_id || '',
     parts: data.parts || [],
     created_at: new Date().toISOString(),
     created_by: createdBy
@@ -85,6 +86,15 @@ export async function create(data, createdBy = 'tech') {
 export async function deleteById(id) {
   const res = await collection().deleteOne({ _id: id });
   return res.deletedCount === 1;
+}
+
+export async function findByBillId(billId) {
+  const docs = await collection().find({ bill_id: billId }).toArray();
+  return docs.map(toApi);
+}
+
+export async function deleteByBillId(billId) {
+  await collection().deleteMany({ bill_id: billId });
 }
 
 export async function updateById(id, updates) {

@@ -38,6 +38,8 @@ export default function QuickInput() {
   const [inventory, setInventory] = useState([]);
   const [partsInventory, setPartsInventory] = useState([]);
   const [parts, setParts] = useState([]); // line items for part_change
+  const [billServices, setBillServices] = useState([]); // staged services pending save
+  const [editingIndex, setEditingIndex] = useState(null); // null = new service, number = editing billServices[i]
   const plateRef = useRef(null);
 
   const isTireChange = form.service_type === 'tire_change';
@@ -84,8 +86,12 @@ export default function QuickInput() {
 
   const selectServiceType = (type) => {
     updateForm('service_type', type);
-    setStep(2);
-    setTimeout(() => plateRef.current?.focus(), 100);
+    if (billServices.length > 0) {
+      setStep(3); // car info already entered
+    } else {
+      setStep(2);
+      setTimeout(() => plateRef.current?.focus(), 100);
+    }
   };
 
   const selectSuggestion = (record) => {
@@ -107,37 +113,82 @@ export default function QuickInput() {
 
   const goToConfirm = () => {
     if (isTireChange && (!form.tire_brand || !form.tire_width || !form.tire_rim || !form.price_per_unit)) return;
+    if (isPartChange && parts.length === 0) return;
+
+    let total_price = form.total_price;
     if (isPartChange) {
-      const total = parts.reduce((s, p) => s + Number(p.price_per_unit || 0) * Number(p.qty || 1), 0);
-      updateForm('total_price', String(total));
-      setStep(4);
-      return;
+      total_price = String(parts.reduce((s, p) => s + Number(p.price_per_unit || 0) * Number(p.qty || 1), 0));
+    } else if (!isTireChange && !total_price) {
+      total_price = '0';
     }
-    if (!isTireChange && !form.total_price) {
-      updateForm('total_price', '0');
+
+    const tireSize = formatTireSize(form.tire_width, form.tire_aspect, form.tire_rim);
+    const entry = {
+      service_type: form.service_type,
+      quantity: form.quantity,
+      tire_brand: form.tire_brand,
+      tire_model: form.tire_model,
+      tire_width: form.tire_width,
+      tire_aspect: form.tire_aspect,
+      tire_rim: form.tire_rim,
+      tire_size: tireSize,
+      price_per_unit: form.price_per_unit,
+      total_price,
+      cost_price: form.cost_price,
+      parts: [...parts],
+    };
+
+    if (editingIndex !== null) {
+      setBillServices(prev => prev.map((svc, i) => i === editingIndex ? entry : svc));
+      setEditingIndex(null);
+    } else {
+      setBillServices(prev => [...prev, entry]);
     }
+
+    // Reset service-specific fields, keep car info and shared fields
+    setForm(f => ({
+      ...f,
+      service_type: '',
+      quantity: '4',
+      tire_brand: '', tire_model: '', tire_width: '', tire_aspect: '', tire_rim: '',
+      price_per_unit: '', total_price: '', cost_price: '',
+    }));
+    setParts([]);
     setStep(4);
   };
 
   const handleSubmit = async () => {
     setSubmitting(true);
+    const billId = (crypto.randomUUID?.() ?? String(Date.now())).replace(/-/g, '').slice(0, 8);
     try {
-      const tireSize = formatTireSize(form.tire_width, form.tire_aspect, form.tire_rim);
-      const basePayload = { ...form, tire_size: tireSize };
-      const payload = isPartChange ? { ...basePayload, parts } : basePayload;
-      const res = await api.post('/services', payload);
-      if (res.success) {
-        setToast({ id: res.data.id, message: 'บันทึกสำเร็จ!' });
-        setForm({
-          service_type: '', license_plate: '', province: '', car_model: '', car_color: '',
-          quantity: '4', tire_brand: '', tire_model: '', tire_width: '', tire_aspect: '', tire_rim: '',
-          cost_price: '', price_per_unit: '', total_price: '', technician: '', notes: '', date: getToday(),
+      for (const svc of billServices) {
+        const res = await api.post('/services', {
+          license_plate: form.license_plate,
+          province: form.province,
+          car_model: form.car_model,
+          car_color: form.car_color,
+          date: form.date,
+          technician: form.technician,
+          notes: form.notes,
+          bill_id: billId,
+          ...svc,
         });
-        setParts([]);
-        setStep(1);
-        setTimeout(() => setToast(null), 6000);
+        if (!res.success) throw new Error(res.error || 'บันทึกไม่สำเร็จ');
       }
-    } catch (err) {
+      setToast({ billId, message: 'บันทึกสำเร็จ!' });
+      setForm({
+        service_type: '', license_plate: '', province: '', car_model: '', car_color: '',
+        quantity: '4', tire_brand: '', tire_model: '', tire_width: '', tire_aspect: '', tire_rim: '',
+        cost_price: '', price_per_unit: '', total_price: '', technician: '', notes: '', date: getToday(),
+      });
+      setParts([]);
+      setBillServices([]);
+      setEditingIndex(null);
+      setStep(1);
+      setTimeout(() => setToast(null), 6000);
+    } catch {
+      // Roll back any services already saved under this bill_id
+      api.delete(`/services/bill/${billId}`).catch(() => {});
       setToast({ message: 'เกิดข้อผิดพลาด กรุณาลองใหม่', error: true });
       setTimeout(() => setToast(null), 4000);
     }
@@ -145,9 +196,9 @@ export default function QuickInput() {
   };
 
   const handleUndo = async () => {
-    if (!toast?.id) return;
+    if (!toast?.billId) return;
     try {
-      await api.delete(`/services/${toast.id}`);
+      await api.delete(`/services/bill/${toast.billId}`);
       setToast({ message: 'ยกเลิกสำเร็จ', undone: true });
       setTimeout(() => setToast(null), 2000);
     } catch {
@@ -183,6 +234,72 @@ export default function QuickInput() {
     }));
   };
 
+  const addAnotherService = () => {
+    setForm(f => ({
+      ...f,
+      service_type: '',
+      quantity: '4',
+      tire_brand: '', tire_model: '', tire_width: '', tire_aspect: '', tire_rim: '',
+      price_per_unit: '', total_price: '', cost_price: '',
+    }));
+    setStep(1);
+  };
+
+  const startEdit = (i) => {
+    const svc = billServices[i];
+    setEditingIndex(i);
+    setForm(f => ({
+      ...f,
+      service_type: svc.service_type,
+      quantity: svc.quantity,
+      tire_brand: svc.tire_brand,
+      tire_model: svc.tire_model,
+      tire_width: svc.tire_width,
+      tire_aspect: svc.tire_aspect,
+      tire_rim: svc.tire_rim,
+      price_per_unit: svc.price_per_unit,
+      total_price: svc.total_price,
+      cost_price: svc.cost_price,
+    }));
+    setParts(svc.parts || []);
+    setStep(3);
+  };
+
+  const removeService = (i) => {
+    const updated = billServices.filter((_, idx) => idx !== i);
+    setBillServices(updated);
+    if (updated.length === 0) {
+      setForm(f => ({
+        ...f,
+        service_type: '',
+        quantity: '4',
+        tire_brand: '', tire_model: '', tire_width: '', tire_aspect: '', tire_rim: '',
+        price_per_unit: '', total_price: '', cost_price: '',
+      }));
+      setStep(1);
+    }
+  };
+
+  const handleBack = () => {
+    if (step === 3 && editingIndex !== null) {
+      // Cancel edit — restore blank service fields and return to bill builder
+      setEditingIndex(null);
+      setForm(f => ({
+        ...f,
+        service_type: '',
+        quantity: '4',
+        tire_brand: '', tire_model: '', tire_width: '', tire_aspect: '', tire_rim: '',
+        price_per_unit: '', total_price: '', cost_price: '',
+      }));
+      setParts([]);
+      setStep(4);
+    } else if (step === 3 && billServices.length > 0) {
+      setStep(1);
+    } else {
+      setStep(s => s - 1);
+    }
+  };
+
   const currentServiceType = SERVICE_TYPES.find(s => s.value === form.service_type);
 
   return (
@@ -191,8 +308,8 @@ export default function QuickInput() {
       <div className="sticky top-0 z-10 glass border-b border-border-light px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            {step > 1 && (
-              <button onClick={() => setStep(s => s - 1)} className="p-1 -ml-1 text-text-secondary">
+            {step > 1 && step !== 4 && (
+              <button onClick={handleBack} className="p-1 -ml-1 text-text-secondary">
                 <span className="material-symbols-outlined">arrow_back</span>
               </button>
             )}
@@ -201,8 +318,8 @@ export default function QuickInput() {
               <p className="text-xs text-text-muted">
                 {step === 1 && 'เลือกประเภทบริการ'}
                 {step === 2 && 'ใส่ทะเบียนรถ'}
-                {step === 3 && (isTireChange ? 'รายละเอียดยาง' : isPartChange ? 'เลือกอะไหล่' : 'รายละเอียดบริการ')}
-                {step === 4 && 'ยืนยันข้อมูล'}
+                {step === 3 && (editingIndex !== null ? 'แก้ไขรายการ' : isTireChange ? 'รายละเอียดยาง' : isPartChange ? 'เลือกอะไหล่' : 'รายละเอียดบริการ')}
+                {step === 4 && `สรุปบิล (${billServices.length} รายการ)`}
               </p>
             </div>
           </div>
@@ -215,6 +332,8 @@ export default function QuickInput() {
                   price_per_unit: '', total_price: '', technician: '', notes: '', date: getToday(),
                 });
                 setParts([]);
+                setBillServices([]);
+                setEditingIndex(null);
                 setStep(1);
               }}
               className="text-xs font-bold text-text-secondary hover:text-danger bg-surface hover:bg-danger-bg px-3 py-1.5 rounded-lg border border-border border-b-2 active:border-b transition-all"
@@ -481,18 +600,6 @@ export default function QuickInput() {
               </div>
             )}
 
-            {/* Notes */}
-            <div className="bg-white rounded-2xl p-5 border border-border-light">
-              <label className="text-xs font-semibold text-text-secondary uppercase tracking-wider block mb-2">หมายเหตุ</label>
-              <textarea
-                value={form.notes}
-                onChange={e => updateForm('notes', e.target.value)}
-                rows={2}
-                placeholder="หมายเหตุเพิ่มเติม..."
-                className="w-full px-3 py-2.5 rounded-xl border border-border bg-surface-dim text-sm outline-none focus:border-primary resize-none"
-              />
-            </div>
-
             <button
               onClick={goToConfirm}
               disabled={
@@ -501,140 +608,156 @@ export default function QuickInput() {
               }
               className="w-full py-3.5 rounded-2xl font-semibold text-white bg-gradient-to-r from-primary to-primary-dark shadow-lg shadow-primary/25 disabled:opacity-40 disabled:shadow-none transition-all active:scale-[0.98] text-sm"
             >
-              ดูสรุป
+              {editingIndex !== null ? 'บันทึกการแก้ไข' : 'ดูสรุป'}
             </button>
           </div>
         )}
 
-        {/* Step 4: Confirmation */}
-        {step === 4 && (
-          <div className="animate-fade-in">
-            <div className="bg-white rounded-2xl border border-border-light overflow-hidden">
-              {/* Summary header */}
-              <div className="p-5 border-b border-border-light" style={{ background: `linear-gradient(135deg, ${currentServiceType?.color}10, transparent)` }}>
-                <div className="flex items-center gap-3">
-                  <span className="material-symbols-outlined text-2xl" style={{ color: currentServiceType?.color, fontVariationSettings: "'FILL' 1" }}>
-                    {currentServiceType?.icon}
-                  </span>
-                  <div>
-                    <p className="font-semibold">{currentServiceType?.label}</p>
-                    <p className="text-xs text-text-muted">{form.date}</p>
-                  </div>
+        {/* Step 4: Bill Builder */}
+        {step === 4 && (() => {
+          const grandTotal = billServices.reduce((s, svc) => s + Number(svc.total_price || 0), 0);
+          return (
+            <div className="animate-fade-in space-y-4">
+              {/* Car info */}
+              <div className="bg-white rounded-2xl p-4 border border-border-light flex items-center gap-3">
+                <span className="material-symbols-outlined text-text-secondary" style={{ fontVariationSettings: "'FILL' 1" }}>directions_car</span>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold">{form.license_plate || '-'}</p>
+                  <p className="text-xs text-text-muted truncate">
+                    {[form.car_model, form.car_color, form.province].filter(Boolean).join(' · ')}
+                  </p>
                 </div>
+                <span className="text-xs text-text-muted shrink-0">{form.date}</span>
               </div>
 
-              {/* Details */}
-              <div className="p-5 space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-text-secondary">ทะเบียนรถ</span>
-                  <span className="font-semibold">{form.license_plate || '-'}</span>
+              {/* Services list */}
+              <div className="bg-white rounded-2xl border border-border-light overflow-hidden">
+                <div className="px-5 py-3 border-b border-border-light">
+                  <p className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
+                    รายการบริการ ({billServices.length})
+                  </p>
                 </div>
-                {form.province && (
-                  <div className="flex justify-between">
-                    <span className="text-text-secondary">จังหวัด</span>
-                    <span>{form.province}</span>
-                  </div>
-                )}
-                {form.car_model && (
-                  <div className="flex justify-between">
-                    <span className="text-text-secondary">รุ่นรถ</span>
-                    <span>{form.car_model}</span>
-                  </div>
-                )}
-                {form.car_color && (
-                  <div className="flex justify-between">
-                    <span className="text-text-secondary">สี</span>
-                    <span>{form.car_color}</span>
-                  </div>
-                )}
-                {isTireChange && (
-                  <>
-                    <hr className="border-border-light" />
-                    <div className="flex justify-between">
-                      <span className="text-text-secondary">จำนวน</span>
-                      <span>{form.quantity} เส้น</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-text-secondary">ยี่ห้อ / รุ่น</span>
-                      <span>{form.tire_brand} {form.tire_model}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-text-secondary">ขนาด</span>
-                      <span>{formatTireSize(form.tire_width, form.tire_aspect, form.tire_rim)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-text-secondary">ราคา/เส้น</span>
-                      <span>{formatCurrency(form.price_per_unit)}</span>
-                    </div>
-                  </>
-                )}
-                {isPartChange && parts.length > 0 && (
-                  <>
-                    <hr className="border-border-light" />
-                    {parts.map((p, i) => (
-                      <div key={i} className="flex justify-between text-sm">
-                        <span className="text-text-secondary">{p.name} × {p.qty}</span>
-                        <span>{formatCurrency(Number(p.price_per_unit) * Number(p.qty))}</span>
+                <div className="divide-y divide-border-light">
+                  {billServices.map((svc, i) => {
+                    const st = SERVICE_TYPES.find(s => s.value === svc.service_type);
+                    return (
+                      <div
+                        key={i}
+                        className="flex items-start border-l-4"
+                        style={{ borderLeftColor: st?.color || '#E2E8F0' }}
+                      >
+                        <div className="flex-1 min-w-0 p-4 flex items-start gap-3">
+                          <span
+                            className="material-symbols-outlined text-xl shrink-0 mt-0.5"
+                            style={{ color: st?.color, fontVariationSettings: "'FILL' 1" }}
+                          >
+                            {st?.icon}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm">{st?.label}</p>
+                            {svc.service_type === 'tire_change' && (
+                              <p className="text-xs text-text-muted mt-0.5">
+                                {[svc.tire_brand, svc.tire_model, svc.tire_size].filter(Boolean).join(' ')} × {svc.quantity} เส้น
+                              </p>
+                            )}
+                            {svc.service_type === 'part_change' && svc.parts.length > 0 && (
+                              <p className="text-xs text-text-muted mt-0.5">
+                                {svc.parts.map(p => `${p.name} ×${p.qty}`).join(', ')}
+                              </p>
+                            )}
+                            <p className="text-sm font-bold text-primary mt-1">{formatCurrency(svc.total_price)}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-0.5 pr-3 pt-3.5 shrink-0">
+                          <button
+                            onClick={() => startEdit(i)}
+                            className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-primary hover:bg-primary-50 transition-colors"
+                            title="แก้ไข"
+                          >
+                            <span className="material-symbols-outlined text-base">edit</span>
+                          </button>
+                          <button
+                            onClick={() => removeService(i)}
+                            className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-danger hover:bg-danger-bg transition-colors"
+                            title="ลบ"
+                          >
+                            <span className="material-symbols-outlined text-base">delete</span>
+                          </button>
+                        </div>
                       </div>
-                    ))}
-                  </>
-                )}
-                {form.notes && (
-                  <div className="flex justify-between">
-                    <span className="text-text-secondary">หมายเหตุ</span>
-                    <span className="text-right max-w-[60%]">{form.notes}</span>
-                  </div>
-                )}
-                <hr className="border-border-light" />
-                <div className="flex justify-between items-center">
-                  <span className="font-semibold">รวมทั้งหมด</span>
-                  <span className="text-xl font-bold text-primary">{formatCurrency(form.total_price)}</span>
+                    );
+                  })}
+                </div>
+                <div className="px-5 py-3 border-t border-border bg-surface-dim flex justify-between items-center">
+                  <span className="font-semibold text-sm">รวมทั้งหมด</span>
+                  <span className="text-xl font-bold text-primary">{formatCurrency(grandTotal)}</span>
                 </div>
               </div>
-            </div>
 
-            {/* Print Receipt */}
-            <div className="flex gap-2 mt-3">
+              {/* Notes */}
+              <div className="bg-white rounded-2xl p-5 border border-border-light">
+                <label className="text-xs font-semibold text-text-secondary uppercase tracking-wider block mb-2">หมายเหตุ</label>
+                <textarea
+                  value={form.notes}
+                  onChange={e => updateForm('notes', e.target.value)}
+                  rows={2}
+                  placeholder="หมายเหตุเพิ่มเติม..."
+                  className="w-full px-3 py-2.5 rounded-xl border border-border bg-surface-dim text-sm outline-none focus:border-primary resize-none"
+                />
+              </div>
+
+              {/* Add another service */}
               <button
-                onClick={() => setShowReceipt(true)}
-                className="flex-1 py-3 rounded-2xl font-semibold text-primary bg-white border-2 border-primary/25 hover:border-primary/60 transition-colors flex items-center justify-center gap-2 text-sm"
+                onClick={addAnotherService}
+                className="w-full py-3 rounded-2xl font-semibold text-primary bg-white border-2 border-primary/25 hover:border-primary/60 transition-colors flex items-center justify-center gap-2 text-sm"
               >
-                <span className="material-symbols-outlined text-lg">receipt_long</span>
-                พิมพ์ใบกำกับภาษี
+                <span className="material-symbols-outlined text-lg">add_circle</span>
+                เพิ่มบริการอื่น
               </button>
+
+              {/* Print Receipt */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowReceipt(true)}
+                  className="flex-1 py-3 rounded-2xl font-semibold text-primary bg-white border-2 border-primary/25 hover:border-primary/60 transition-colors flex items-center justify-center gap-2 text-sm"
+                >
+                  <span className="material-symbols-outlined text-lg">receipt_long</span>
+                  พิมพ์ใบกำกับภาษี
+                </button>
+                <button
+                  onClick={() => setShowCashBill(true)}
+                  className="flex-1 py-3 rounded-2xl font-semibold text-primary bg-white border-2 border-primary/25 hover:border-primary/60 transition-colors flex items-center justify-center gap-2 text-sm"
+                >
+                  <span className="material-symbols-outlined text-lg">receipt</span>
+                  พิมพ์บิลเงินสด
+                </button>
+              </div>
+
               <button
-                onClick={() => setShowCashBill(true)}
-                className="flex-1 py-3 rounded-2xl font-semibold text-primary bg-white border-2 border-primary/25 hover:border-primary/60 transition-colors flex items-center justify-center gap-2 text-sm"
+                onClick={handleSubmit}
+                disabled={submitting}
+                className="w-full py-3.5 rounded-2xl font-bold text-white bg-gradient-to-r from-primary to-primary-dark shadow-lg shadow-primary/25 disabled:opacity-50 transition-all active:scale-[0.98] text-sm flex items-center justify-center gap-2"
               >
-                <span className="material-symbols-outlined text-lg">receipt</span>
-                พิมพ์บิลเงินสด
+                {submitting ? (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
+                    ยืนยันบันทึก
+                  </>
+                )}
               </button>
             </div>
-
-            <button
-              onClick={handleSubmit}
-              disabled={submitting}
-              className="w-full mt-3 py-3.5 rounded-2xl font-bold text-white bg-gradient-to-r from-primary to-primary-dark shadow-lg shadow-primary/25 disabled:opacity-50 transition-all active:scale-[0.98] text-sm flex items-center justify-center gap-2"
-            >
-              {submitting ? (
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <>
-                  <span className="material-symbols-outlined text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
-                  ยืนยันบันทึก
-                </>
-              )}
-            </button>
-          </div>
-        )}
+          );
+        })()}
       </div>
 
       {/* Receipt Modal */}
       {showReceipt && (
-        <ReceiptModal form={form} onClose={() => setShowReceipt(false)} />
+        <ReceiptModal form={form} billServices={billServices} onClose={() => setShowReceipt(false)} />
       )}
       {showCashBill && (
-        <CashBillModal form={form} onClose={() => setShowCashBill(false)} />
+        <CashBillModal form={form} billServices={billServices} onClose={() => setShowCashBill(false)} />
       )}
 
       {/* Toast */}
@@ -646,7 +769,7 @@ export default function QuickInput() {
             {toast.error ? 'error' : toast.undone ? 'undo' : 'check_circle'}
           </span>
           <span className="text-sm font-medium flex-1">{toast.message}</span>
-          {toast.id && !toast.undone && (
+          {toast.billId && !toast.undone && (
             <button
               onClick={handleUndo}
               className="text-sm font-bold underline underline-offset-2 hover:opacity-80"
@@ -768,7 +891,7 @@ function PartLineItems({ parts, setParts, partsInventory }) {
   );
 }
 
-function CashBillModal({ form, onClose }) {
+function CashBillModal({ form, billServices, onClose }) {
   const [config, setConfig] = useState(DEFAULT_CASH_BILL_CONFIG);
   const receiptNumber = `TT-${(form.date || '').replace(/-/g, '')}-${String(Date.now()).slice(-4)}`;
 
@@ -810,14 +933,14 @@ function CashBillModal({ form, onClose }) {
           </div>
         </div>
         <div className="overflow-auto max-h-[60vh] p-4 flex justify-center">
-          <ReceiptDocument config={config} data={form} receiptNumber={receiptNumber} type="cash_bill" />
+          <ReceiptDocument config={config} data={form} receiptNumber={receiptNumber} type="cash_bill" services={billServices} />
         </div>
       </div>
     </div>
   );
 }
 
-function ReceiptModal({ form, onClose }) {
+function ReceiptModal({ form, billServices, onClose }) {
   const [config, setConfig] = useState(DEFAULT_CONFIG);
   const receiptNumber = `TT-${(form.date || '').replace(/-/g, '')}-${String(Date.now()).slice(-4)}`;
   const hasConfig = config.shop_name && config.tax_id;
@@ -871,7 +994,7 @@ function ReceiptModal({ form, onClose }) {
 
         {/* Receipt content */}
         <div className="overflow-auto max-h-[60vh] p-4 flex justify-center">
-          <ReceiptDocument config={config} data={form} receiptNumber={receiptNumber} />
+          <ReceiptDocument config={config} data={form} receiptNumber={receiptNumber} services={billServices} />
         </div>
       </div>
     </div>
