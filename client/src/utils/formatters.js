@@ -69,5 +69,6 @@ export function getToday() {
 
 export function formatTireSize(width, aspect, rim) {
   if (!width && !aspect && !rim) return '';
-  return `${width || ''}/${aspect || ''}R${rim || ''}`;
+  if (aspect) return `${width || ''}/${aspect}R${rim || ''}`;
+  return `${width || ''}R${rim || ''}`;
 }
