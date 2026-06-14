@@ -367,7 +367,6 @@ export default function Inventory() {
                   />
                   <span className="text-text-muted font-semibold text-lg">/</span>
                   <input
-                    required
                     type="number"
                     placeholder="45"
                     min="1"
@@ -386,7 +385,7 @@ export default function Inventory() {
                     className="w-16 px-3 py-2 rounded-xl border border-border bg-surface-dim outline-none focus:border-primary text-center font-medium"
                   />
                 </div>
-                {form.tire_width && form.tire_aspect && form.tire_rim && (
+                {form.tire_width && form.tire_rim && (
                   <p className="mt-1.5 text-xs text-text-muted">
                     ขนาด: <span className="font-semibold text-primary">{formatTireSize(form.tire_width, form.tire_aspect, form.tire_rim)}</span>
                   </p>
