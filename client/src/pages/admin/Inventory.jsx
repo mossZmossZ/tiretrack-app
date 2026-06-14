@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import Swal from 'sweetalert2';
 import withReactContent from 'sweetalert2-react-content';
 import { api } from '../../services/api.js';
-import { formatCurrency, formatDate } from '../../utils/formatters.js';
+import { formatCurrency, formatDate, formatTireSize } from '../../utils/formatters.js';
+import BrandSelect from '../../components/BrandSelect.jsx';
 
 const MySwal = withReactContent(Swal);
 
@@ -15,11 +16,14 @@ export default function Inventory() {
   const [editingRecord, setEditingRecord] = useState(null);
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
-  
+  const [customBrands, setCustomBrands] = useState([]);
+
   // Form state
   const [form, setForm] = useState({
     tire_brand: '',
-    tire_size: '',
+    tire_width: '',
+    tire_aspect: '',
+    tire_rim: '',
     tire_model: '',
     cost_price: ''
   });
@@ -37,10 +41,16 @@ export default function Inventory() {
 
   useEffect(() => { loadData(); }, []);
 
+  useEffect(() => {
+    api.get('/tire-brands').then(res => {
+      if (res.success) setCustomBrands(res.data);
+    }).catch(() => {});
+  }, []);
+
   const handleDelete = async (id) => {
     const result = await MySwal.fire({
       title: 'ต้องการลบข้อมูลยางนี้?',
-      text: 'รายการจะถูกย้ายไปถังขยะ และจะถูกลบออกอัตโนมัติใน 1 วัน',
+      text: "คุณจะไม่สามารถกู้คืนข้อมูลนี้ได้!",
       icon: 'warning',
       showCancelButton: true,
       confirmButtonColor: '#F97316',
@@ -54,7 +64,7 @@ export default function Inventory() {
         const res = await api.delete(`/inventory/${id}`);
         if (res.success) {
           setRecords(r => r.filter(rec => rec.id !== id));
-          MySwal.fire({ title: 'ย้ายไปถังขยะแล้ว!', icon: 'success', confirmButtonColor: '#F97316' });
+          MySwal.fire({ title: 'ลบสำเร็จ!', icon: 'success', confirmButtonColor: '#F97316' });
         } else {
           MySwal.fire({ title: 'ผิดพลาด', text: res.error, icon: 'error', confirmButtonColor: '#F97316' });
         }
@@ -101,15 +111,63 @@ export default function Inventory() {
     }
   };
 
+  const handleAddBrand = async (name) => {
+    try {
+      const res = await api.post('/tire-brands', { name });
+      if (res.success) {
+        setCustomBrands(prev => [...prev, res.data]);
+        setForm(f => ({ ...f, tire_brand: name }));
+      }
+    } catch {}
+  };
+
+  const handleEditBrand = async (id, name) => {
+    const oldName = customBrands.find(b => b.id === id)?.name;
+    try {
+      const res = await api.put(`/tire-brands/${id}`, { name });
+      if (res.success) {
+        setCustomBrands(prev => prev.map(b => b.id === id ? { ...b, name } : b));
+        if (form.tire_brand === oldName) setForm(f => ({ ...f, tire_brand: name }));
+        MySwal.fire({ title: 'แก้ไขสำเร็จ!', icon: 'success', confirmButtonColor: '#F97316', timer: 1500, showConfirmButton: false });
+      } else {
+        MySwal.fire({ title: 'ผิดพลาด', text: res.error, icon: 'error', confirmButtonColor: '#F97316' });
+      }
+    } catch {
+      MySwal.fire({ title: 'ผิดพลาด', text: 'เกิดข้อผิดพลาด', icon: 'error', confirmButtonColor: '#F97316' });
+    }
+  };
+
+  const handleDeleteBrand = async (id) => {
+    const removed = customBrands.find(b => b.id === id);
+    // Optimistic remove
+    setCustomBrands(prev => prev.filter(b => b.id !== id));
+    if (form.tire_brand === removed?.name) setForm(f => ({ ...f, tire_brand: '' }));
+
+    try {
+      const res = await api.delete(`/tire-brands/${id}`);
+      if (res.success) {
+        MySwal.fire({ title: 'ลบสำเร็จ!', icon: 'success', confirmButtonColor: '#F97316', timer: 1200, showConfirmButton: false });
+      } else {
+        if (removed) setCustomBrands(prev => [...prev, removed].sort((a, b) => a.name.localeCompare(b.name)));
+        MySwal.fire({ title: 'ผิดพลาด', text: res.error, icon: 'error', confirmButtonColor: '#F97316' });
+      }
+    } catch {
+      if (removed) setCustomBrands(prev => [...prev, removed].sort((a, b) => a.name.localeCompare(b.name)));
+      MySwal.fire({ title: 'ผิดพลาด', text: 'เกิดข้อผิดพลาด', icon: 'error', confirmButtonColor: '#F97316' });
+    }
+  };
+
   const openAddModal = () => {
-    setForm({ tire_brand: '', tire_size: '', tire_model: '', cost_price: '' });
+    setForm({ tire_brand: '', tire_width: '', tire_aspect: '', tire_rim: '', tire_model: '', cost_price: '' });
     setIsAdding(true);
   };
 
   const openEditModal = (record) => {
     setForm({
       tire_brand: record.tire_brand,
-      tire_size: record.tire_size,
+      tire_width: record.tire_width,
+      tire_aspect: record.tire_aspect,
+      tire_rim: record.tire_rim,
       tire_model: record.tire_model,
       cost_price: record.cost_price
     });
@@ -122,11 +180,14 @@ export default function Inventory() {
   };
 
   // Filter records
-  const filteredRecords = records.filter(r => 
-    (r.tire_brand && r.tire_brand.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (r.tire_size && r.tire_size.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (r.tire_model && r.tire_model.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const filteredRecords = records.filter(r => {
+    const q = searchQuery.toLowerCase();
+    return (
+      (r.tire_brand && r.tire_brand.toLowerCase().includes(q)) ||
+      (formatTireSize(r.tire_width, r.tire_aspect, r.tire_rim).toLowerCase().includes(q)) ||
+      (r.tire_model && r.tire_model.toLowerCase().includes(q))
+    );
+  });
 
   const handleImport = async (file) => {
     if (!file) return;
@@ -242,7 +303,7 @@ export default function Inventory() {
                       <td className="px-4 py-3">
                         <span className="font-semibold text-text-primary">{record.tire_brand}</span>
                       </td>
-                      <td className="px-4 py-3 font-medium">{record.tire_size}</td>
+                      <td className="px-4 py-3 font-medium">{formatTireSize(record.tire_width, record.tire_aspect, record.tire_rim)}</td>
                       <td className="px-4 py-3 text-text-secondary">{record.tire_model || '-'}</td>
                       <td className="px-4 py-3 text-right font-semibold text-text-primary text-danger">
                         {formatCurrency(record.cost_price)}
@@ -282,26 +343,54 @@ export default function Inventory() {
             <form onSubmit={handleSave} className="space-y-4">
               <div>
                 <label className="text-xs font-semibold text-text-secondary mb-1 block">ยี่ห้อยาง *</label>
-                <input
-                  required
-                  type="text"
-                  placeholder="เช่น Michelin, Bridgestone, ฯลฯ"
+                <BrandSelect
                   value={form.tire_brand}
-                  onChange={e => setForm({...form, tire_brand: e.target.value})}
-                  className="w-full px-3 py-2 rounded-xl border border-border bg-surface-dim outline-none focus:border-primary"
+                  onChange={brand => setForm(f => ({ ...f, tire_brand: brand }))}
+                  customBrands={customBrands}
+                  onAdd={handleAddBrand}
+                  onEdit={handleEditBrand}
+                  onDelete={handleDeleteBrand}
                 />
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-text-secondary mb-1 block">ขนาดยาง *</label>
-                <input
-                  required
-                  type="text"
-                  placeholder="เช่น 215/45-17"
-                  value={form.tire_size}
-                  onChange={e => setForm({...form, tire_size: e.target.value})}
-                  className="w-full px-3 py-2 rounded-xl border border-border bg-surface-dim outline-none focus:border-primary"
-                />
+                <label className="text-xs font-semibold text-text-secondary mb-1.5 block">ขนาดยาง *</label>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    required
+                    type="number"
+                    placeholder="215"
+                    min="1"
+                    value={form.tire_width}
+                    onChange={e => setForm({...form, tire_width: e.target.value})}
+                    className="w-20 px-3 py-2 rounded-xl border border-border bg-surface-dim outline-none focus:border-primary text-center font-medium"
+                  />
+                  <span className="text-text-muted font-semibold text-lg">/</span>
+                  <input
+                    required
+                    type="number"
+                    placeholder="45"
+                    min="1"
+                    value={form.tire_aspect}
+                    onChange={e => setForm({...form, tire_aspect: e.target.value})}
+                    className="w-16 px-3 py-2 rounded-xl border border-border bg-surface-dim outline-none focus:border-primary text-center font-medium"
+                  />
+                  <span className="text-text-muted font-semibold text-base">R</span>
+                  <input
+                    required
+                    type="number"
+                    placeholder="17"
+                    min="1"
+                    value={form.tire_rim}
+                    onChange={e => setForm({...form, tire_rim: e.target.value})}
+                    className="w-16 px-3 py-2 rounded-xl border border-border bg-surface-dim outline-none focus:border-primary text-center font-medium"
+                  />
+                </div>
+                {form.tire_width && form.tire_aspect && form.tire_rim && (
+                  <p className="mt-1.5 text-xs text-text-muted">
+                    ขนาด: <span className="font-semibold text-primary">{formatTireSize(form.tire_width, form.tire_aspect, form.tire_rim)}</span>
+                  </p>
+                )}
               </div>
 
               <div>

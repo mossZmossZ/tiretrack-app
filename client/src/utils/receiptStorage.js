@@ -1,4 +1,4 @@
-const KEY = 'tiretrack_receipt_config';
+import { api } from '../services/api.js';
 
 export const DEFAULT_CONFIG = {
   shop_name: '',
@@ -7,14 +7,31 @@ export const DEFAULT_CONFIG = {
   vat_registered: true,
 };
 
-export function getReceiptConfig() {
+export const DEFAULT_CASH_BILL_CONFIG = {
+  shop_name: '',
+  address: '',
+};
+
+export async function getReceiptConfig() {
   try {
-    const stored = localStorage.getItem(KEY);
-    if (stored) return { ...DEFAULT_CONFIG, ...JSON.parse(stored) };
+    const res = await api.get('/settings/receipt');
+    if (res.success) return { ...DEFAULT_CONFIG, ...res.data };
   } catch {}
   return { ...DEFAULT_CONFIG };
 }
 
-export function saveReceiptConfig(config) {
-  localStorage.setItem(KEY, JSON.stringify(config));
+export async function saveReceiptConfig(config) {
+  return api.put('/settings/receipt', config);
+}
+
+export async function getCashBillConfig() {
+  try {
+    const res = await api.get('/settings/cashbill');
+    if (res.success) return { ...DEFAULT_CASH_BILL_CONFIG, ...res.data };
+  } catch {}
+  return { ...DEFAULT_CASH_BILL_CONFIG };
+}
+
+export async function saveCashBillConfig(config) {
+  return api.put('/settings/cashbill', config);
 }
