@@ -25,7 +25,7 @@ export function formatDate(dateStr) {
   const d = new Date(dateStr + (dateStr.includes('T') ? '' : 'T00:00:00'));
   const day = d.getDate();
   const month = THAI_MONTHS_SHORT[d.getMonth()];
-  const year = d.getFullYear() + 543; // Convert to Buddhist Era
+  const year = d.getFullYear();
   return `${day} ${month} ${year}`;
 }
 
@@ -34,7 +34,7 @@ export function formatDateFull(dateStr) {
   const d = new Date(dateStr + (dateStr.includes('T') ? '' : 'T00:00:00'));
   const day = d.getDate();
   const month = THAI_MONTHS_FULL[d.getMonth()];
-  const year = d.getFullYear() + 543;
+  const year = d.getFullYear();
   return `${day} ${month} ${year}`;
 }
 

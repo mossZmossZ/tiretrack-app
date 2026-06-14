@@ -51,14 +51,21 @@ export default function Dashboard() {
 
   // Revenue chart — last 12 months
   const THAI_MONTH_SHORT = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  const validMonthKey = /^\d{4}-(0[1-9]|1[0-2])$/;
+  const maxYear = new Date().getFullYear() + 1;
   const revenueData = Object.entries(stats.monthlyRevenue)
+    .filter(([month]) => {
+      const year = Number(month.slice(0, 4));
+      return validMonthKey.test(month) && year >= 2000 && year <= maxYear;
+    })
     .sort((a, b) => a[0].localeCompare(b[0]))
     .slice(-12)
     .map(([month, revenue]) => {
       const [yearStr, mStr] = month.split('-');
-      const yearShort = String(Number(yearStr)).slice(-2);
-      const monthLabel = THAI_MONTH_SHORT[Number(mStr) - 1] || mStr;
-      return { month: `${monthLabel} ${yearShort}`, revenue };
+      return {
+        month: `${THAI_MONTH_SHORT[Number(mStr) - 1]} ${String(Number(yearStr)).slice(-2)}`,
+        revenue,
+      };
     });
 
   return (
@@ -114,7 +121,7 @@ export default function Dashboard() {
             <p className="text-xs text-text-muted mt-0.5">12 เดือนล่าสุด</p>
           </div>
           <span className="text-xs text-text-secondary bg-surface px-3 py-1.5 rounded-lg border border-border-light font-medium">
-            {new Date().toLocaleDateString('th-TH', { month: 'long', year: 'numeric' })}
+            {`${new Date().toLocaleDateString('th-TH', { month: 'long' })} ${new Date().getFullYear()}`}
           </span>
         </div>
         {revenueData.length > 0 ? (

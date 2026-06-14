@@ -140,10 +140,12 @@ export async function getStats() {
   });
 
   const monthlyRevenue = {};
-  const validMonth = /^\d{4}-\d{2}$/;
+  const validMonth = /^\d{4}-(0[1-9]|1[0-2])$/;
+  const maxYear = now.getFullYear() + 1;
   all.forEach(r => {
-    const month = r.date?.slice(0, 7);
-    if (month && validMonth.test(month) && Number(month.slice(0, 4)) >= 2000) {
+    const month = (r.date || '').slice(0, 7);
+    const year = Number(month.slice(0, 4));
+    if (validMonth.test(month) && year >= 2000 && year <= maxYear) {
       monthlyRevenue[month] = (monthlyRevenue[month] || 0) + Number(r.total_price || 0);
     }
   });
@@ -182,11 +184,19 @@ export async function importLegacy(csvContent) {
       const dateRaw = values[0]?.trim();
       if (!dateRaw) { skipped++; continue; }
 
-      let date = dateRaw;
-      const dateParts = dateRaw.split('/');
-      if (dateParts.length === 3) {
-        const [d, m, y] = dateParts;
-        date = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+      let date = dateRaw.trim();
+      const slashParts = date.split('/');
+      if (slashParts.length === 3) {
+        const [d, m, y] = slashParts.map(s => s.trim());
+        let year = Number(y);
+        if (year < 100) year += 2000; // expand 2-digit CE year e.g. 23 → 2023
+        date = `${year}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+      }
+      // Skip rows with unparseable or implausible dates
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number(date.slice(0, 4)) < 2000) {
+        errors.push(`Row ${i + 1}: วันที่ไม่ถูกต้อง "${dateRaw}"`);
+        skipped++;
+        continue;
       }
 
       const plateRaw = values[1]?.trim() || '';
