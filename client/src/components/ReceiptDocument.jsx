@@ -1,4 +1,4 @@
-import { TIRE_BRANDS, SERVICE_TYPE_MAP } from '../utils/constants.js';
+import { SERVICE_TYPE_MAP } from '../utils/constants.js';
 import { formatCurrency, formatDate } from '../utils/formatters.js';
 
 export function ReceiptDocument({ config, data, receiptNumber, type = 'tax_invoice', services }) {
@@ -12,7 +12,7 @@ export function ReceiptDocument({ config, data, receiptNumber, type = 'tax_invoi
   const subtotal = total - vatAmount;
 
   // Single-service fallback fields
-  const brandLabel = TIRE_BRANDS.find(b => b.code === data.tire_brand)?.label || data.tire_brand || '';
+  const brandLabel = data.tire_brand || '';
   const serviceLabel = SERVICE_TYPE_MAP[data.service_type]?.label || data.service_type || '';
   const isTireChange = data.service_type === 'tire_change';
 
@@ -92,7 +92,7 @@ export function ReceiptDocument({ config, data, receiptNumber, type = 'tax_invoi
         <div style={{ marginBottom: '4px' }}>
           {services.map((svc, i) => {
             const svcLabel = SERVICE_TYPE_MAP[svc.service_type]?.label || svc.service_type || '';
-            const svcBrand = TIRE_BRANDS.find(b => b.code === svc.tire_brand)?.label || svc.tire_brand || '';
+            const svcBrand = svc.tire_brand || '';
             const svcIsTire = svc.service_type === 'tire_change';
             const svcIsPart = svc.service_type === 'part_change';
             const svcTotal = Number(svc.total_price || 0);

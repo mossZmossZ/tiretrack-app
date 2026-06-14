@@ -212,7 +212,7 @@ export default function QuickInput() {
     const desc = [item.tire_brand, sizeLabel, item.tire_model].filter(Boolean).join(' | ');
     return {
       value: item.id,
-      label: `${desc} (ต้นทุน: ${formatCurrency(item.cost_price)})`,
+      label: desc,
       item: item
     };
   });
@@ -797,7 +797,7 @@ function PartLineItems({ parts, setParts, partsInventory }) {
       name: item.name,
       category: item.category,
       qty: 1,
-      price_per_unit: item.cost_price,
+      price_per_unit: '',
       cost_price: item.cost_price,
     }]);
     setSelectedPartId('');
