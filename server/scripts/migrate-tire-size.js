@@ -13,10 +13,17 @@ const DRY_RUN = !process.argv.includes('--apply');
 
 function parseTireSize(raw) {
   if (!raw || typeof raw !== 'string') return null;
-  // Matches: "215/45-17", "215/45R17", "215/45 R17"
-  const m = raw.trim().match(/^(\d+)\s*\/\s*(\d+)\s*[-R\s]\s*(\d+)$/i);
-  if (!m) return null;
-  return { tire_width: m[1], tire_aspect: m[2], tire_rim: m[3] };
+  const s = raw.trim();
+  // With aspect ratio, slash separator: "215/45-17", "215/45R17", "215/45 R17"
+  const m1 = s.match(/^(\d+)\s*\/\s*(\d+)\s*[-R\s]\s*(\d+)$/i);
+  if (m1) return { tire_width: m1[1], tire_aspect: m1[2], tire_rim: m1[3] };
+  // With aspect ratio, all-dash: "265-60-18"
+  const m3 = s.match(/^(\d+)-(\d+)-(\d+)$/);
+  if (m3) return { tire_width: m3[1], tire_aspect: m3[2], tire_rim: m3[3] };
+  // Without aspect ratio: "195-14", "750-16", "750R16"
+  const m2 = s.match(/^(\d+)\s*[-R]\s*(\d+)$/i);
+  if (m2) return { tire_width: m2[1], tire_aspect: '', tire_rim: m2[2] };
+  return null;
 }
 
 async function run() {

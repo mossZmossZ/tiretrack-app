@@ -2,43 +2,36 @@
  * Clears all tire inventory records from MongoDB.
  *
  * Usage:
- *   cd server
- *   node scripts/clear-inventory.js
- *
- * Requires MONGODB_URI in ../.env.
+ *   node --env-file=.env server/scripts/clear-inventory.js           # dry run (safe)
+ *   node --env-file=.env server/scripts/clear-inventory.js --apply   # delete records
  */
 
-import path from 'path';
-import { fileURLToPath } from 'url';
-import dotenv from 'dotenv';
-import mongoose from 'mongoose';
+import { MongoClient } from 'mongodb';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+const DRY_RUN = !process.argv.includes('--apply');
 
-const inventorySchema = new mongoose.Schema({ _id: String }, { strict: false });
-const Inventory = mongoose.model('Inventory', inventorySchema);
+async function run() {
+  const uri = process.env.MONGODB_URI;
+  const dbName = process.env.MONGODB_DB || 'tiretrack';
+  if (!uri) throw new Error('MONGODB_URI is not set');
 
-async function clear() {
-  const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/tiretrack';
-  console.log('Connecting to', uri);
-  await mongoose.connect(uri);
+  const client = new MongoClient(uri);
+  await client.connect();
+  const col = client.db(dbName).collection('inventory');
 
-  const count = await Inventory.countDocuments();
+  const count = await col.countDocuments();
   console.log(`Found ${count} inventory records.`);
+  console.log(DRY_RUN ? '--- DRY RUN (no writes) ---' : '--- DELETING ---');
 
-  if (count > 0) {
-    const result = await Inventory.deleteMany({});
+  if (!DRY_RUN && count > 0) {
+    const result = await col.deleteMany({});
     console.log(`Deleted ${result.deletedCount} inventory records.`);
-  } else {
+  } else if (count === 0) {
     console.log('Nothing to delete.');
   }
 
-  await mongoose.disconnect();
-  console.log('Done. Inventory cleared.');
+  await client.close();
+  console.log('Done.');
 }
 
-clear().catch((err) => {
-  console.error('Clear failed:', err.message);
-  process.exit(1);
-});
+run().catch(err => { console.error('Clear failed:', err.message); process.exit(1); });
