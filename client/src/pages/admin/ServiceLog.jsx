@@ -164,6 +164,7 @@ export default function ServiceLog() {
                       <td className="px-4 py-3 text-text-secondary whitespace-nowrap">{formatDate(record.date)}</td>
                       <td className="px-4 py-3">
                         <span className="font-semibold text-text-primary bg-surface-dim px-2 py-0.5 rounded">{record.license_plate || '-'}</span>
+                        {record.province && <span className="text-xs text-text-muted ml-1">· {record.province}</span>}
                         {record.car_model && <span className="text-xs text-text-muted ml-2">{record.car_model}</span>}
                       </td>
                       <td className="px-4 py-3">
@@ -248,14 +249,25 @@ export default function ServiceLog() {
           <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
             <h3 className="text-xl font-bold mb-4" style={{ fontFamily: 'Manrope' }}>แก้ไขข้อมูลบริการ</h3>
             <form onSubmit={handleEditSave} className="space-y-4">
-              <div>
-                <label className="text-xs font-semibold text-text-secondary mb-1 block">ทะเบียนรถ</label>
-                <input
-                  type="text"
-                  value={editingRecord.license_plate}
-                  onChange={e => setEditingRecord({...editingRecord, license_plate: e.target.value})}
-                  className="w-full px-3 py-2 rounded-xl border border-border bg-surface-dim outline-none focus:border-primary"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-text-secondary mb-1 block">ทะเบียนรถ</label>
+                  <input
+                    type="text"
+                    value={editingRecord.license_plate}
+                    onChange={e => setEditingRecord({...editingRecord, license_plate: e.target.value})}
+                    className="w-full px-3 py-2 rounded-xl border border-border bg-surface-dim outline-none focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-text-secondary mb-1 block">จังหวัด</label>
+                  <input
+                    type="text"
+                    value={editingRecord.province}
+                    onChange={e => setEditingRecord({...editingRecord, province: e.target.value})}
+                    className="w-full px-3 py-2 rounded-xl border border-border bg-surface-dim outline-none focus:border-primary"
+                  />
+                </div>
               </div>
               
               {editingRecord.service_type === 'tire_change' ? (

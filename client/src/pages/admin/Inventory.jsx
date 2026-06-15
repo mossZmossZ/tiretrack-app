@@ -17,6 +17,11 @@ export default function Inventory() {
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [customBrands, setCustomBrands] = useState([]);
+  const [pendingItems, setPendingItems] = useState([]);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [showPending, setShowPending] = useState(false);
+  const [linkingId, setLinkingId] = useState(null);
+  const [linkSearch, setLinkSearch] = useState('');
 
   // Form state
   const [form, setForm] = useState({
@@ -32,14 +37,22 @@ export default function Inventory() {
     setLoading(true);
     try {
       const res = await api.get('/inventory');
-      if (res.success) {
-        setRecords(res.data);
-      }
+      if (res.success) setRecords(res.data);
     } catch {}
     setLoading(false);
   };
 
-  useEffect(() => { loadData(); }, []);
+  const loadPending = async () => {
+    try {
+      const res = await api.get('/pending');
+      if (res.success) {
+        setPendingItems(res.data);
+        setPendingCount(res.meta.total);
+      }
+    } catch {}
+  };
+
+  useEffect(() => { loadData(); loadPending(); }, []);
 
   useEffect(() => {
     api.get('/tire-brands').then(res => {
@@ -157,6 +170,34 @@ export default function Inventory() {
     }
   };
 
+  const handlePendingAdd = async (item) => {
+    try {
+      const res = await api.post(`/pending/${item.id}/resolve`, { action: 'add' });
+      if (res.success) {
+        setPendingItems(p => p.filter(x => x.id !== item.id));
+        setPendingCount(c => c - 1);
+        setRecords(r => [...r, res.data]);
+        MySwal.fire({ title: 'เพิ่มในคลังแล้ว!', text: 'ราคาทุนยังเป็น 0 — กรุณากรอกราคาทุนในภายหลัง', icon: 'success', confirmButtonColor: '#F97316' });
+      }
+    } catch {
+      MySwal.fire({ title: 'ผิดพลาด', text: 'เกิดข้อผิดพลาด', icon: 'error', confirmButtonColor: '#F97316' });
+    }
+  };
+
+  const handlePendingLink = async (id) => {
+    try {
+      const res = await api.post(`/pending/${id}/resolve`, { action: 'link' });
+      if (res.success) {
+        setPendingItems(p => p.filter(x => x.id !== id));
+        setPendingCount(c => c - 1);
+        setLinkingId(null);
+        setLinkSearch('');
+      }
+    } catch {
+      MySwal.fire({ title: 'ผิดพลาด', text: 'เกิดข้อผิดพลาด', icon: 'error', confirmButtonColor: '#F97316' });
+    }
+  };
+
   const openAddModal = () => {
     setForm({ tire_brand: '', tire_width: '', tire_aspect: '', tire_rim: '', tire_model: '', cost_price: '' });
     setIsAdding(true);
@@ -259,6 +300,19 @@ export default function Inventory() {
             <span className="hidden sm:inline">ส่งออก</span>
           </button>
 
+          {pendingCount > 0 && (
+            <button
+              onClick={() => setShowPending(true)}
+              className="py-2 px-3 rounded-xl font-semibold text-white bg-amber-500 hover:bg-amber-600 transition-colors flex items-center gap-1.5 text-sm whitespace-nowrap relative"
+            >
+              <span className="material-symbols-outlined text-lg">pending_actions</span>
+              <span className="hidden sm:inline">รอตรวจสอบ</span>
+              <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                {pendingCount > 99 ? '99+' : pendingCount}
+              </span>
+            </button>
+          )}
+
           <button
             onClick={openAddModal}
             className="py-2 px-4 rounded-xl font-semibold text-white bg-primary hover:bg-primary-dark transition-colors flex items-center gap-2 text-sm whitespace-nowrap"
@@ -332,6 +386,99 @@ export default function Inventory() {
           </table>
         </div>
       </div>
+
+      {/* Pending Review Modal */}
+      {showPending && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 animate-fade-in backdrop-blur-sm">
+          <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[85vh]">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border-light shrink-0">
+              <div>
+                <h3 className="text-lg font-bold" style={{ fontFamily: 'Manrope' }}>รอตรวจสอบ</h3>
+                <p className="text-xs text-text-muted mt-0.5">ยางจากการนำเข้าที่ยังไม่มีในคลัง — เลือก "เพิ่มใหม่" หรือ "เชื่อมกับรายการที่มี"</p>
+              </div>
+              <button onClick={() => { setShowPending(false); setLinkingId(null); setLinkSearch(''); }} className="p-2 rounded-lg text-text-muted hover:bg-surface-dim transition-colors">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <div className="overflow-y-auto flex-1 p-4 space-y-2">
+              {pendingItems.length === 0 ? (
+                <div className="text-center py-12 text-text-muted">
+                  <span className="material-symbols-outlined text-4xl block mb-2">check_circle</span>
+                  ไม่มีรายการรอตรวจสอบ
+                </div>
+              ) : pendingItems.map(item => {
+                const sizeDisplay = [item.tire_width, item.tire_aspect].filter(Boolean).join('/') + (item.tire_aspect ? '-' : '-') + item.tire_rim;
+                const isLinking = linkingId === item.id;
+                const linkResults = isLinking
+                  ? records.filter(r => {
+                      const q = linkSearch.toLowerCase();
+                      return !q || r.tire_brand.toLowerCase().includes(q) || r.tire_model.toLowerCase().includes(q) ||
+                        `${r.tire_width}/${r.tire_aspect}-${r.tire_rim}`.includes(q) || `${r.tire_width}-${r.tire_rim}`.includes(q);
+                    }).slice(0, 8)
+                  : [];
+
+                return (
+                  <div key={item.id} className="border border-border-light rounded-xl p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-text-primary">{item.tire_brand || '-'}</span>
+                          {item.tire_model && <span className="text-text-secondary text-sm">{item.tire_model}</span>}
+                          <span className="font-medium text-primary">{item.tire_size || sizeDisplay}</span>
+                        </div>
+                        <p className="text-xs text-text-muted mt-1">พบใน CSV: {item.count} รายการ</p>
+                      </div>
+                      <div className="flex gap-2 shrink-0">
+                        <button
+                          onClick={() => handlePendingAdd(item)}
+                          className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-primary hover:bg-primary-dark transition-colors"
+                        >
+                          เพิ่มใหม่
+                        </button>
+                        <button
+                          onClick={() => { setLinkingId(isLinking ? null : item.id); setLinkSearch(''); }}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors border ${isLinking ? 'bg-surface-dim border-border text-text-secondary' : 'border-border text-text-secondary hover:border-primary hover:text-primary'}`}
+                        >
+                          เชื่อมกับรายการที่มี
+                        </button>
+                      </div>
+                    </div>
+
+                    {isLinking && (
+                      <div className="space-y-2">
+                        <input
+                          autoFocus
+                          type="text"
+                          value={linkSearch}
+                          onChange={e => setLinkSearch(e.target.value)}
+                          placeholder="ค้นหายี่ห้อ, รุ่น, ขนาด..."
+                          className="w-full px-3 py-2 rounded-xl border border-border bg-surface-dim text-sm outline-none focus:border-primary"
+                        />
+                        <div className="space-y-1 max-h-40 overflow-y-auto">
+                          {linkResults.map(inv => (
+                            <button
+                              key={inv.id}
+                              onClick={() => handlePendingLink(item.id)}
+                              className="w-full text-left px-3 py-2 rounded-lg hover:bg-primary-50 transition-colors text-sm flex items-center justify-between gap-2"
+                            >
+                              <span><span className="font-semibold">{inv.tire_brand}</span> {inv.tire_model} <span className="text-primary">{formatTireSize(inv.tire_width, inv.tire_aspect, inv.tire_rim)}</span></span>
+                              <span className="text-xs text-text-muted shrink-0">{formatCurrency(inv.cost_price)}</span>
+                            </button>
+                          ))}
+                          {linkResults.length === 0 && linkSearch && (
+                            <p className="text-xs text-text-muted px-3 py-2">ไม่พบ — ลองค้นหาคำอื่น</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add / Edit Modal */}
       {(isAdding || editingRecord) && (

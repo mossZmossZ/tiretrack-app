@@ -6,7 +6,7 @@ const COLLECTION = 'inventory';
 
 const HEADERS = ['id', 'tire_brand', 'tire_width', 'tire_aspect', 'tire_rim', 'tire_model', 'cost_price', 'created_at'];
 
-function parseTireSize(raw) {
+export function parseTireSize(raw) {
   if (!raw || typeof raw !== 'string') return null;
   const s = raw.trim();
   // With aspect ratio, slash separator: "215/70-15", "215/70R15", "215/70 R15"
@@ -15,6 +15,9 @@ function parseTireSize(raw) {
   // With aspect ratio, all-dash: "265-60-18"
   const m3 = s.match(/^(\d+)-(\d+)-(\d+)$/);
   if (m3) return { tire_width: m3[1], tire_aspect: m3[2], tire_rim: m3[3] };
+  // LT/special cross-section: "31*10.5-15", "31x10.5-15"
+  const m4 = s.match(/^(\d+[*xX]\d+\.?\d*)\s*[-R]\s*(\d+)$/i);
+  if (m4) return { tire_width: m4[1], tire_aspect: '', tire_rim: m4[2] };
   // Without aspect ratio: "195-14", "750-16", "750R16"
   const m2 = s.match(/^(\d+)\s*[-R]\s*(\d+)$/i);
   if (m2) return { tire_width: m2[1], tire_aspect: '', tire_rim: m2[2] };

@@ -129,6 +129,15 @@ export default function ImportExport() {
                     <p className="text-success">ตรงกับ Inventory: {result.details.matched} รายการ</p>
                   )}
                   {result.details.skipped > 0 && <p>ข้าม: {result.details.skipped} รายการ</p>}
+                  {result.details.matched > 0 && (
+                    <p className="text-success">ตรงกับคลังสินค้า: {result.details.matched} รายการ</p>
+                  )}
+                  {result.details.unmatched > 0 && (
+                    <p className="text-warning" style={{ color: '#F59E0B' }}>ไม่พบในคลัง: {result.details.unmatched} รายการ — ดูได้ที่ "รอตรวจสอบ" ในหน้าฐานข้อมูลยาง</p>
+                  )}
+                  {result.details.newBrands?.length > 0 && (
+                    <p className="text-primary">เพิ่มยี่ห้อยางใหม่: {result.details.newBrands.join(', ')}</p>
+                  )}
                   {result.details.errors?.length > 0 && (
                     <div className="mt-1">
                       <p className="text-danger">ข้อผิดพลาด:</p>

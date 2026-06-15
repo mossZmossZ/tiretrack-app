@@ -1,6 +1,9 @@
 import { v4 as uuidv4 } from 'uuid';
 import { getDb } from '../db/mongo.js';
 import { parseCSVLine, serializeRecords } from '../lib/csv.js';
+import * as tireBrandsService from './tire-brands.service.js';
+import { parseTireSize, readAll as readAllInventory } from './inventory.service.js';
+import * as pendingService from './pending.service.js';
 
 const COLLECTION = 'services';
 
@@ -172,11 +175,26 @@ export async function getStats() {
 
 export async function importLegacy(csvContent) {
   const lines = csvContent.split('\n').filter(l => l.trim());
-  if (lines.length <= 1) return { imported: 0, skipped: 0, errors: [] };
+  if (lines.length <= 1) return { imported: 0, matched: 0, skipped: 0, errors: [], newBrands: [], unmatched: 0 };
 
   let imported = 0;
+  let matched = 0;
   let skipped = 0;
   const errors = [];
+
+  // Tire brand auto-add
+  const existingBrands = new Set((await tireBrandsService.readAll()).map(b => b.name));
+  const newBrandsToAdd = new Set();
+
+  // Cost lookup: brand|width|aspect|rim → cost_price (model ignored for matching)
+  const costMap = new Map();
+  for (const item of await readAllInventory()) {
+    const key = `${item.tire_brand}|${item.tire_width}|${item.tire_aspect}|${item.tire_rim}`;
+    if (!costMap.has(key)) costMap.set(key, item.cost_price);
+  }
+
+  // Unmatched tires to add to pending (deduped within this import)
+  const unmatchedData = new Map(); // pendingKey → { brand, model, sizeRaw, width, aspect, rim }
 
   for (let i = 1; i < lines.length; i++) {
     try {
@@ -202,12 +220,38 @@ export async function importLegacy(csvContent) {
       const plateRaw = values[1]?.trim() || '';
       let plate = plateRaw;
       let province = '';
-      if (plateRaw.endsWith('กทม')) {
-        plate = plateRaw.slice(0, -3);
-        province = 'กรุงเทพมหานคร';
-      } else if (plateRaw.endsWith('พช')) {
-        plate = plateRaw.slice(0, -2);
-        province = 'เพชรบูรณ์';
+      // Thai plate format: [optional_digit][Thai_letters][digits][Thai_province]
+      const plateMatch = plateRaw.match(/^(.*?\d+)([฀-๿]+)$/);
+      if (plateMatch) {
+        plate = plateMatch[1];
+        province = plateMatch[2];
+      }
+
+      const tireBrand = values[5]?.trim() || '';
+      if (tireBrand && !existingBrands.has(tireBrand) && !newBrandsToAdd.has(tireBrand)) {
+        newBrandsToAdd.add(tireBrand);
+      }
+
+      const tireModel = values[6]?.trim() || '';
+      const tireSizeRaw = values[7]?.trim() || '';
+      const parsedSize = parseTireSize(tireSizeRaw);
+
+      // Match cost from inventory by brand + normalized size (model ignored)
+      let costPrice = '0';
+      if (tireBrand && parsedSize) {
+        const costKey = `${tireBrand}|${parsedSize.tire_width}|${parsedSize.tire_aspect}|${parsedSize.tire_rim}`;
+        if (costMap.has(costKey)) {
+          costPrice = costMap.get(costKey);
+          matched++;
+        } else {
+          const pendingKey = `${tireBrand}|${tireModel}|${parsedSize.tire_width}|${parsedSize.tire_aspect}|${parsedSize.tire_rim}`;
+          if (!unmatchedData.has(pendingKey)) {
+            unmatchedData.set(pendingKey, {
+              brand: tireBrand, model: tireModel, sizeRaw: tireSizeRaw,
+              width: parsedSize.tire_width, aspect: parsedSize.tire_aspect, rim: parsedSize.tire_rim
+            });
+          }
+        }
       }
 
       const priceStr = (values[8] || '').replace(/[,฿\s]/g, '').trim();
@@ -222,11 +266,12 @@ export async function importLegacy(csvContent) {
         car_color: values[3]?.trim() || '',
         service_type: 'tire_change',
         quantity: String(qty),
-        tire_brand: values[5]?.trim() || '',
-        tire_model: values[6]?.trim() || '',
-        tire_size: values[7]?.trim() || '',
+        tire_brand: tireBrand,
+        tire_model: tireModel,
+        tire_size: tireSizeRaw,
         price_per_unit: String(price),
         total_price: String(qty * price),
+        cost_price: costPrice,
         notes: values[9]?.trim() || ''
       }, 'admin');
 
@@ -237,7 +282,15 @@ export async function importLegacy(csvContent) {
     }
   }
 
-  return { imported, skipped, errors };
+  for (const brand of newBrandsToAdd) {
+    await tireBrandsService.create(brand);
+  }
+
+  for (const d of unmatchedData.values()) {
+    await pendingService.upsert(d.brand, d.model, d.sizeRaw, d.width, d.aspect, d.rim);
+  }
+
+  return { imported, matched, skipped, errors, newBrands: [...newBrandsToAdd], unmatched: unmatchedData.size };
 }
 
 export async function exportAll() {

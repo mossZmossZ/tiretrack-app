@@ -10,6 +10,7 @@ import backupRoutes from './routes/backup.routes.js';
 import settingsRoutes from './routes/settings.routes.js';
 import partsInventoryRoutes from './routes/parts-inventory.routes.js';
 import tireBrandsRoutes from './routes/tire-brands.routes.js';
+import pendingRoutes from './routes/pending.routes.js';
 import { initAutoBackup } from './services/backup.service.js';
 import { connectMongo, closeMongo } from './db/mongo.js';
 
@@ -31,6 +32,7 @@ app.use('/api/backup', backupRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/parts-inventory', partsInventoryRoutes);
 app.use('/api/tire-brands', tireBrandsRoutes);
+app.use('/api/pending', pendingRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
