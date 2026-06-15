@@ -153,6 +153,14 @@ export async function getStats() {
     }
   });
 
+  const thirtyDaysAgo = localDateStr(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30));
+  const dailyRevenue = {};
+  all.forEach(r => {
+    if (r.date && r.date >= thirtyDaysAgo && r.date <= today) {
+      dailyRevenue[r.date] = (dailyRevenue[r.date] || 0) + Number(r.total_price || 0);
+    }
+  });
+
   const sumTotal = (records) => records.reduce((s, r) => s + Number(r.total_price || 0), 0);
   const sumCost = (records) => records.reduce((s, r) => s + (Number(r.cost_price || 0) * Number(r.quantity || 1)), 0);
   const sumTires = (records) => records
@@ -169,6 +177,7 @@ export async function getStats() {
     serviceBreakdown,
     brandCounts,
     monthlyRevenue,
+    dailyRevenue,
     recentRecords: sortedAsc.slice(-10).reverse()
   };
 }

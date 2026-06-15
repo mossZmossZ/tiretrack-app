@@ -16,7 +16,16 @@ router.use(requireAuth);
 router.get('/', async (req, res) => {
   try {
     let records = await serviceService.readAll();
-    const { search, type, page = 1, limit = 50 } = req.query;
+    const { search, type, page = 1, limit = 50, from, to } = req.query;
+
+    const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+    if ((from && !dateRe.test(from)) || (to && !dateRe.test(to))) {
+      return res.status(400).json({ success: false, error: 'Invalid date range' });
+    }
+
+    if (from && to) {
+      records = records.filter(r => r.date >= from && r.date <= to);
+    }
 
     if (search) {
       records = records.filter(r =>
