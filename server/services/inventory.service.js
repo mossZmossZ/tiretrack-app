@@ -18,8 +18,8 @@ export function parseTireSize(raw) {
   // LT/special cross-section: "31*10.5-15", "31x10.5-15"
   const m4 = s.match(/^(\d+[*xX]\d+\.?\d*)\s*[-R]\s*(\d+)$/i);
   if (m4) return { tire_width: m4[1], tire_aspect: '', tire_rim: m4[2] };
-  // Without aspect ratio: "195-14", "750-16", "750R16"
-  const m2 = s.match(/^(\d+)\s*[-R]\s*(\d+)$/i);
+  // Without aspect ratio: "195-14", "750-16", "750R16", "7.50-16", "8.25-16"
+  const m2 = s.match(/^(\d+(?:\.\d+)?)\s*[-R]\s*(\d+)$/i);
   if (m2) return { tire_width: m2[1], tire_aspect: '', tire_rim: m2[2] };
   return null;
 }
