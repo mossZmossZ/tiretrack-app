@@ -57,15 +57,15 @@ export default function AdminMobileNav() {
         </NavLink>
 
         <NavLink
-          to="/admin/backup"
+          to="/admin/settings"
           className={({ isActive }) =>
             `flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-xl transition-all ${
               isActive ? 'text-primary' : 'text-text-muted'
             }`
           }
         >
-          <span className="material-symbols-outlined text-2xl">cloud_sync</span>
-          <span className="text-[10px] font-semibold">สำรอง</span>
+          <span className="material-symbols-outlined text-2xl">settings</span>
+          <span className="text-[10px] font-semibold">ตั้งค่า</span>
         </NavLink>
 
       </div>

@@ -7,12 +7,9 @@ import AdminMobileNav from './components/layout/AdminMobileNav.jsx';
 import TopHeader from './components/layout/TopHeader.jsx';
 import Dashboard from './pages/admin/Dashboard.jsx';
 import ServiceLog from './pages/admin/ServiceLog.jsx';
-import ImportExport from './pages/admin/ImportExport.jsx';
 import Inventory from './pages/admin/Inventory.jsx';
-import BackupSettings from './pages/admin/BackupSettings.jsx';
-import ReceiptSettings from './pages/admin/ReceiptSettings.jsx';
-import CashBillSettings from './pages/admin/CashBillSettings.jsx';
 import PartsInventory from './pages/admin/PartsInventory.jsx';
+import Settings from './pages/admin/Settings.jsx';
 import QuickInput from './pages/tech/QuickInput.jsx';
 import RecentEntries from './pages/tech/RecentEntries.jsx';
 
@@ -85,10 +82,11 @@ export default function App() {
           <Route path="/admin/dashboard" element={<Dashboard />} />
           <Route path="/admin/services" element={<ServiceLog />} />
           <Route path="/admin/inventory" element={<Inventory />} />
-          <Route path="/admin/import" element={<ImportExport />} />
-          <Route path="/admin/backup" element={<BackupSettings />} />
-          <Route path="/admin/receipt" element={<ReceiptSettings />} />
-          <Route path="/admin/cashbill" element={<CashBillSettings />} />
+          <Route path="/admin/settings" element={<Settings />} />
+          <Route path="/admin/import" element={<Navigate to="/admin/settings" replace />} />
+          <Route path="/admin/backup" element={<Navigate to="/admin/settings" replace />} />
+          <Route path="/admin/receipt" element={<Navigate to="/admin/settings" replace />} />
+          <Route path="/admin/cashbill" element={<Navigate to="/admin/settings" replace />} />
           <Route path="/admin/parts-inventory" element={<PartsInventory />} />
           <Route path="/admin/input" element={<QuickInput />} />
         </Route>

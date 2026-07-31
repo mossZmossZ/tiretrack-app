@@ -21,12 +21,9 @@ const NAV_GROUPS = [
     ],
   },
   {
-    label: 'Operations',
+    label: 'Settings',
     items: [
-      { to: '/admin/import', icon: 'upload_file', label: 'นำเข้า/ส่งออก' },
-      { to: '/admin/backup', icon: 'cloud_sync', label: 'สำรองข้อมูล' },
-      { to: '/admin/receipt', icon: 'receipt_long', label: 'ตั้งค่าใบกำกับภาษี' },
-      { to: '/admin/cashbill', icon: 'receipt', label: 'ตั้งค่าบิลเงินสด' },
+      { to: '/admin/settings', icon: 'settings', label: 'ตั้งค่า' },
     ],
   },
 ];
